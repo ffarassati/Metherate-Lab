@@ -1,0 +1,14 @@
+#!/bin/bash
+
+echo Beginning install process for DataProcessor dependencies...
+echo
+python3.7 -m pip install axographio
+python3.7 -m pip install matplotlib
+echo Going back to login directory, changing to flash drive...
+echo
+cd ~
+cd /Volumes/NO\ NAME
+echo Starting DataProcessorv3...
+echo
+python3 DataProcessorv3\ Mac.py
+
