@@ -63,12 +63,8 @@ class DataProcessor:
         self.AxographFile = inputfile
 
     def msToTimeIndex(self, ms):
-        #print("Looking for", ms)
-        #print(self.Time)
         for index in range(len(self.Time)):
-            #print(self.Time[index], (ms > self.Time[index]))
             if (not ms > self.Time[index]):
-                #print(str(self.Time[index-1]) + "is the closest value")
                 return (index - 1)
 
     def peak(self, channel, searchStart, searchEnd):
@@ -89,7 +85,7 @@ class DataProcessor:
             pass # in case the loop goes past the end of the time window
         maxvalue = total / 41   
         
-        return (self.Time[time], maxvalue)
+        return (self.Time[time])#, maxvalue)
 
     def stddeviation(self, channel, searchStart, searchEnd):
         datapoints = []
@@ -155,7 +151,6 @@ class DataProcessor:
         self.PlusMaxSlope = PlusMaxSlope
         self.RegressionPoints = RegressionPoints
         
-        
         self.OnsetLatency = self.emptyChannelsDict()
         self.InitialPeak = self.emptyChannelsDict()
         self.MaxPeak = self.emptyChannelsDict()
@@ -167,10 +162,22 @@ class DataProcessor:
             self.OnsetLatency[channel] = self.onset(channel, StandardDeviation)
             if (self.OnsetLatency[channel] != "(?)"):
                 ThisOnset = self.OnsetLatency[channel]
-                #self.InitialMaxSlope[channel] = self.slopeonsetpeak(channel)
                 self.InitialPeak[channel] = self.peak(channel, ThisOnset, ThisOnset + self.PlusInitialPeak)
                 self.MaxPeak[channel] = self.peak(channel, ThisOnset, ThisOnset + self.PlusMaxPeak)
+                #self.InitialMaxSlope[channel] = self.slopeonsetpeak(channel)
                  
+    def getOnsetLatency(self):
+        return self.OnsetLatency
+        
+    def getInitialPeak(self):
+        return self.InitialPeak
+
+    def getMaxPeak(self):
+        return self.MaxPeak        
+
+    def getInitialMaxSlope(self):
+        return self.InitialMaxSlope  
+        
     def Extract(self, filename):
         if (getFileExt(filename) == ".atf"):
             self.extractATF(filename)
@@ -193,19 +200,7 @@ class DataProcessor:
     def getTimeFromPercent(self, DecimalValue):
         #print(DecimalValue, "x", self.Time[-1], "=", int(math.ceil(self.Time[-1]*DecimalValue)))
         return int(math.ceil(self.Time[-1]*DecimalValue))
-    
-    def getOnsetLatency(self):
-        return self.OnsetLatency
         
-    def getInitialPeak(self):
-        return self.InitialPeak
-
-    def getMaxPeak(self):
-        return self.MaxPeak        
-
-    def getInitialMaxSlope(self):
-        return self.InitialMaxSlope  
-
     def getNumberOfChannels(self):
         return self.NumberOfChannels
      

@@ -8,13 +8,14 @@ from tkinter import *
 from tkinter import filedialog
 from tkinter import messagebox
 import tkinter.ttk as ttk
+import xlsxwriter
 from functools import partial
-import matplotlib
-import matplotlib.pyplot as plt
-from matplotlib.backends.backend_tkagg import (FigureCanvasTkAgg, NavigationToolbar2Tk)
-from matplotlib.backend_bases import key_press_handler
-from matplotlib.figure import Figure
-matplotlib.use("TkAgg")
+#import matplotlib
+#import matplotlib.pyplot as plt
+#from matplotlib.backends.backend_tkagg import (FigureCanvasTkAgg, NavigationToolbar2Tk)
+#from matplotlib.backend_bases import key_press_handler
+#from matplotlib.figure import Figure
+#matplotlib.use("TkAgg")
 from processor import DataProcessor
 import threading
 
@@ -67,7 +68,7 @@ class DataProcessorGUI:
        
         # Default Values / State
         self.Name = name
-        self.OutputFileType = ".txt"
+        self.OutputFileType = ".xlsx"
         self.OutputFileName = ""
         self.InputFileName = ""
         self.Canvas = "None"
@@ -87,11 +88,11 @@ class DataProcessorGUI:
             self.taskbar.columnconfigure(6, weight=1)
 
             # Taskbar - Content
-            openfile = Button(master=self.taskbar, text="Open File", command=self.OpenFile, width = 7)
+            openfile = Button(master=self.taskbar, text="Choose File", command=self.OpenFile, width = 9)
             openfile.grid(row=0, column=0, sticky=W+E, padx=5)
             openfile['state'] = NORMAL
             
-            openfolder = Button(master=self.taskbar, text="Open Folder", command=self.OpenDir, width = 10)
+            openfolder = Button(master=self.taskbar, text="Choose Folder", command=self.OpenDir, width = 11)
             openfolder.grid(row=0, column=1, sticky=W+E, padx=0)
             openfolder['state'] = NORMAL
             
@@ -328,7 +329,6 @@ class DataProcessorGUI:
         
         self.export['state'] = NORMAL # allow for the export button to work
         self.export['command'] = self.Export
-        self.view['command'] = self.View
         self.view['state'] = DISABLED # disable the view button
         self.prepFields()
     
@@ -358,7 +358,6 @@ class DataProcessorGUI:
                     
                     self.export['state'] = NORMAL # allow for the export button to work
                     self.export['command'] = self.ExportDir
-                    self.view['command'] = self.ViewDir
                     self.view['state'] = DISABLED # disable the view button
                     self.prepFields()
 
@@ -410,51 +409,79 @@ class DataProcessorGUI:
 
     def Export(self):
         if self.ValidateSliders():
-        
             self.Processor.Process(self.BaselineStart, self.BaselineEnd, self.OnsetStart, self.OnsetEnd, self.DeviationMultiplier, self.PlusInitialPeak, self.PlusMaxPeak, self.PlusMaxSlope, self.RegressionPoints)
             
-            self.OutputDirectory = self.DefaultDirectory + SLASH + self.Name + " Outputs"
-            if not os.path.exists(self.OutputDirectory):
-                os.makedirs(self.OutputDirectory)
-            
-            self.OutputFileName = self.InputFileName[self.InputFileName.rfind('/')+1:self.InputFileName.find(".")] + " Report"
-            
+            if GRAPH == True:
+                self.showGraph(self.InputFileName, self.Processor.getAxographFile()) if (self.Processor.isGraphable()) else self.clearGraph()   
+                    
             if (self.OutputFileType == ".txt"):
-                self.OutputFileName += ".txt"
-                self.OutputToTxt(self.OutputDirectory + SLASH + self.OutputFileName) 
+                self.OutputToTxt(); 
             elif (self.OutputFileType == ".xlsx"):
-                self.OutputFileName += " XLSX.txt"
-                self.OutputToTxt(self.OutputDirectory + SLASH + self.OutputFileName) 
-            
-            self.GUIPrint(self.OutputFileName + " created in source folder subdirectory.")
+                # Create an excel file
+                self.OutputExcelFile = self.InitXLSX()
+                if (self.OutputExcelFile == None):
+                    return False
+                # Call a self.function() appending the contents of the current self.Processor to the end of the excel file
+                OnsetSheet = self.CreateXLSXSheet("Onset Latency")
+                InitialPeakSheet = self.CreateXLSXSheet("Initial Peak")
+                MaxPeakSheet = self.CreateXLSXSheet("Max Peak")          
+                self.OutputToXLSX(OnsetSheet, self.Processor.getOnsetLatency())
+                self.OutputToXLSX(InitialPeakSheet, self.Processor.getInitialPeak())
+                self.OutputToXLSX(MaxPeakSheet, self.Processor.getMaxPeak())
+                # Close the excel file  
+                self.CloseXLSX()
+            self.view['command'] = self.ViewFile
             self.view['state'] = NORMAL
-            
-            #print(self.OutputFileName + " created in source folder subdirectory.")
-           
+
         else:
             self.GUIPrint("Slider values are not logical.")
-            
+        
     def ExportDir(self):
         if self.ValidateSliders():
             message = "Process all .AXGR and .ATF files in " + self.DefaultDirectory + " with the variables inputted? (This will overwrite any prexisting reports of those files in the output folder)"
             MsgBox = messagebox.askquestion("Process all files?", message)
             if (MsgBox == 'no'):
                 return False
-            self.root['cursor'] = "watch"
-            threading.Thread(target=self.ExportDirThread).start() 
-            # Insert Export Dir Thread Here VVV
+            else:
+                threading.Thread(target=self.ExportDirThread).start() 
         else:
             self.GUIPrint("Slider values are not logical.")
     
     def ExportDirThread(self):
-        for i in sorted(os.listdir(self.DefaultDirectory)):
-            if (not os.path.isdir(self.DefaultDirectory + SLASH + i)) and (getFileExt(i) == ".atf" or getFileExt(i) == ".axgr"): 
-                self.InputFileName = (self.DefaultDirectory + '/' + i)
+        if self.OutputFileType == ".xlsx":
+            self.OutputExcelFile = self.InitXLSX()
+            if (self.OutputExcelFile == None):  
+                return False
+            OnsetSheet = self.CreateXLSXSheet("Onset Latency")
+            InitialPeakSheet = self.CreateXLSXSheet("Initial Peak")
+            MaxPeakSheet = self.CreateXLSXSheet("Max Peak")
+        self.root['cursor'] = "watch"    
+        column_counter = 0
+        for possible_file in sorted(os.listdir(self.DefaultDirectory)):
+            if (not os.path.isdir(self.DefaultDirectory + SLASH + possible_file)) and (getFileExt(possible_file) == ".atf" or getFileExt(possible_file) == ".axgr"): 
+                
+                self.InputFileName = (self.DefaultDirectory + '/' + possible_file)
                 self.Processor = DataProcessor()
                 self.Processor.Extract(self.InputFileName)
+                self.Processor.Process(self.BaselineStart, self.BaselineEnd, self.OnsetStart, self.OnsetEnd, self.DeviationMultiplier, self.PlusInitialPeak, self.PlusMaxPeak, self.PlusMaxSlope, self.RegressionPoints)
+                     
                 if GRAPH == True:
                     self.showGraph(self.InputFileName, self.Processor.getAxographFile()) if (self.Processor.isGraphable()) else self.clearGraph()   
-                self.Export()  
+                    
+                if (self.OutputFileType == ".txt"):
+                    self.OutputToTxt();                                   
+                    self.view['command'] = self.ViewDir
+                elif (self.OutputFileType == ".xlsx"):
+                    column_counter += 1
+                    self.OutputToXLSX(OnsetSheet, self.Processor.getOnsetLatency(), column_counter)
+                    self.OutputToXLSX(InitialPeakSheet, self.Processor.getInitialPeak(), column_counter)
+                    self.OutputToXLSX(MaxPeakSheet, self.Processor.getMaxPeak(), column_counter)
+                    self.view['command'] = self.ViewFile
+
+                self.view['state'] = NORMAL
+                
+        if self.OutputFileType == ".xlsx":        
+            self.CloseXLSX() 
         self.GUIPrint("All files processed into source folder subdirectory.")  
         self.root['cursor'] = ""    
     
@@ -463,29 +490,109 @@ class DataProcessorGUI:
             os.startfile(self.OutputDirectory)
         else:
             self.GUIPrint(self.OutputDirectory + " can't been found.")
-             
-    def View(self):
+        
+    def ViewFile(self):
         if os.path.isfile(self.OutputDirectory + SLASH + self.OutputFileName):
             os.startfile(self.OutputDirectory + SLASH + self.OutputFileName)
         else:
             self.GUIPrint(self.OutputFileName + " has been deleted.")
 
-    def OutputToTxt(self, oname):
+    def InitXLSX(self):
+        try:
+            # Make output directory if it doesn't already exist
+            self.OutputDirectory = self.DefaultDirectory + SLASH + self.Name + " Outputs"
+            if not os.path.exists(self.OutputDirectory):
+                os.makedirs(self.OutputDirectory)
+                 
+            # Make output file name     
+            self.OutputFileName = "Weiner Report 13.xlsx"
+            oname = self.OutputDirectory + SLASH + self.OutputFileName
+            
+            # Open and initialize file
+            if os.path.isfile(oname):
+                os.remove(oname)
+            
+            return xlsxwriter.Workbook(oname)  
+        except PermissionError as e:
+            self.GUIPrint(self.OutputFileName + " in use; can't be modified.")
+            return None
+
+    def CreateXLSXSheet(self, name):
+        this_sheet = self.OutputExcelFile.add_worksheet(name)
+        this_sheet.write(0, 0, "Channels")
+        for num in range(self.Processor.getNumberOfChannels()):
+            this_sheet.write(num+1, 0, num+1)
+        
+        return this_sheet
+    
+    
+    def OutputToXLSX(self, this_sheet, dictionary, column_counter=1): 
+
+        counter = 1
+        this_sheet.write(0, column_counter, self.InputFileName[self.InputFileName.rfind('/')+1:self.InputFileName.find(".")])
+        for channelitem in dictionary:
+            value = dictionary[channelitem]
+            if value != "(?)" and value != 0:
+                this_sheet.write(counter, column_counter, round(value, 2))
+            counter += 1
+        # x=1
+        # y=2
+        # z=3
+
+        # list1=[2.34,4.346,4.234]
+
+        # this_sheet.write(0, 0, "Display")
+        # this_sheet.write(1, 0, "Dominance")
+        # this_sheet.write(2, 0, "Test")
+
+        # this_sheet.write(0, 1, x)
+        # this_sheet.write(1, 1, y)
+        # this_sheet.write(2, 1, z)
+
+        # this_sheet.write(4, 0, "Stimulus Time")
+        # this_sheet.write(4, 1, "Wacktion Time")
+
+        # i=4
+
+        # for n in list1:
+            # i = i+1
+            # this_sheet.write(i, 0, n)
+        
+        self.GUIPrint("Processing " + self.InputFileName[self.InputFileName.rfind('/')+1:self.InputFileName.find(".")])
+        print("Adding " + this_sheet.get_name() + " to " + self.InputFileName[self.InputFileName.rfind('/')+1:self.InputFileName.find(".")])
+        
+            
+    def CloseXLSX(self):
+        self.OutputExcelFile.close()  
+        print(self.OutputFileName + " created in source folder subdirectory.")
+        self.GUIPrint(self.OutputFileName + " created in source folder subdirectory.")
+
+    def OutputToTxt(self):
+        # Make output directory if it doesn't already exist
+        self.OutputDirectory = self.DefaultDirectory + SLASH + self.Name + " Outputs"
+        if not os.path.exists(self.OutputDirectory):
+            os.makedirs(self.OutputDirectory)
+        
+        # Make output file name
+        self.OutputFileName = self.InputFileName[self.InputFileName.rfind('/')+1:self.InputFileName.find(".")] + " Report.txt"  
+        oname = self.OutputDirectory + SLASH + self.OutputFileName
+   
+        # Open and initialize file
         outputfile = open(oname,"w")
         outputfile.write(oname[oname.rfind("\\")+1:] + "\n" + datetime.datetime.now().strftime("%Y-%m-%d, Time %H:%M:%S") + "\n")
         outputfile.write(str(self.Processor.getNumberOfLines()) + " datapoints, " + str(self.Processor.getNumberOfChannels()) + " channels." + "\n\n")
       
-        
-        
-        self.writeOutputToFile(outputfile, "OnsetLatency", self.Processor.getOnsetLatency())
-        self.writeOutputToFile(outputfile, ("Initial Peak (+ " + str(self.PlusInitialPeak) + " ms)"), self.Processor.getInitialPeak())
-        self.writeOutputToFile(outputfile, ("Max Peak (+ " + str(self.PlusMaxPeak) + " ms)"), self.Processor.getMaxPeak())
-        #self.writeOutputToFile(outputfile, ("Max Initial Slope (+ " + str(self.PlusMaxSlope) + " ms)"), self.Processor.getMaxPeak())
+        self.OutputToTxtWrite(outputfile, "Onset Latency", self.Processor.getOnsetLatency())
+        self.OutputToTxtWrite(outputfile, ("Initial Peak (+ " + str(self.PlusInitialPeak) + " ms)"), self.Processor.getInitialPeak())
+        self.OutputToTxtWrite(outputfile, ("Max Peak (+ " + str(self.PlusMaxPeak) + " ms)"), self.Processor.getMaxPeak())
+        #self.OutputToTxtWrite(outputfile, ("Max Initial Slope (+ " + str(self.PlusMaxSlope) + " ms)"), self.Processor.getMaxPeak())
         
         outputfile.close() #print(oname[oname.rfind("\\")+1:] + " created.")
         
-    def writeOutputToFile(self, outputfile, title, resultdict):
-        OutputDict = resultdict
+        print(self.OutputFileName + " created in source folder subdirectory.")
+        self.GUIPrint(self.OutputFileName + " created in source folder subdirectory.")
+        
+    def OutputToTxtWrite(self, outputfile, title, OutputDict):
         outputfile.write(title+":\n")
         for channel in OutputDict:
             outputfile.write(str(channel) + ": " + str(OutputDict[channel]) + "\n")
@@ -623,15 +730,6 @@ class DataProcessorGUI:
                
     def SelectOutputType(self, event):
         self.OutputFileType = self.ComboBox.get()
-    
-    # def SelectOutputMethod(self):
-        # if self.UseLastDirectory.get():
-            # USELASTOUTPUTDIRECTORY = True
-            # print("Remember directory")
-        # else:
-            # USELASTOUTPUTDIRECTORY = False
-            # print("New directory")
-         
 
 if __name__ == "__main__":       
     GUI = DataProcessorGUI()

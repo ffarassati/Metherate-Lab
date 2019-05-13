@@ -1,15 +1,18 @@
-import xlwt
+import xlsxwriter
 import os
+
+filename = "trial.xlsx"
+if os.path.isfile(filename):
+    os.remove(filename)
+workbook = xlsxwriter.Workbook(filename)
+
+sheet1 = workbook.add_worksheet("Sheet 1")
 
 x=1
 y=2
 z=3
 
 list1=[2.34,4.346,4.234]
-
-book = xlwt.Workbook(encoding="utf-8")
-
-sheet1 = book.add_sheet("Sheet 1")
 
 sheet1.write(0, 0, "Display")
 sheet1.write(1, 0, "Dominance")
@@ -28,7 +31,5 @@ for n in list1:
     i = i+1
     sheet1.write(i, 0, n)
 
-filename = "trial.xls"
-if os.path.isfile(filename):
-    os.remove(filename)
-book.save(filename)
+
+workbook.close()
