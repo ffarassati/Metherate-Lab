@@ -2,12 +2,6 @@ import axographio
 import statistics
 import math
 
-# User-Inputed (stay between changing files)
-Slider_Left = 300/90
-Slider_Mid = 300/100
-Slider_Right = 300/130
-DeviationMultiplier = 3
-
 # Static functions
 def getFileExt(path):
     # Returns the file extension (i.e. '.atf') from any file path string
@@ -83,9 +77,9 @@ class DataProcessor:
                 total += self.Channels[channel][time + index]
         except Exception as e:
             pass # in case the loop goes past the end of the time window
-        maxvalue = total / 41   
+        #maxvalue = total / 41   
         
-        return (self.Time[time])#, maxvalue)
+        return (self.Time[time], maxvalue) # [0] is the latency, [1] is the amplitude
 
     def stddeviation(self, channel, searchStart, searchEnd):
         datapoints = []
@@ -93,49 +87,69 @@ class DataProcessor:
             datapoints.append(self.Channels[channel][index])
         return statistics.stdev(datapoints)
 
-    def onset(self, channel, StandardDeviation):
-        #self.OnsetStart, self.OnsetEnd, self.DeviationMultiplier)
-        #time = self.peak(channel)[0]
-        #maxvalue = self.peak(channel)[1]
-        #print(stddeviation(channel)) if channel == 9 else None
+    def onsetHelper(self, channel, possible_onsets, total, portion):
+        onset = "(?)"
         
-        # for 10 milliseconds, 80% of the datapoints are higher/lower than 3/5 of the datapoints previous to it
-        OnsetPoint = self.DeviationMultiplier * StandardDeviation
-        #print(channel, "Onset point:", OnsetPoint)
-        
-        last_onset = "(?)"
-        for index in (range(self.msToTimeIndex(self.OnsetStart), self.msToTimeIndex(self.OnsetEnd))):
-            if (abs(self.Channels[channel][index]) >= abs(OnsetPoint) and abs(self.Channels[channel][index+1]) <= abs(OnsetPoint)) or (abs(self.Channels[channel][index]) <= abs(OnsetPoint) and abs(self.Channels[channel][index+1]) >= abs(OnsetPoint)):
-                last_onset = self.Time[index]
-                #print("Possible onset between (", self.Time[index], ")", self.Channels[channel][index], "and", self.Channels[channel][index+1], "(", self.Time[index], ")")
-
-        
+        #print("Checking for", portion, "/", total, ":")
+        for index in possible_onsets:
+            asc_counter = 0
+            for plus in range(total):
+                if self.Channels[channel][index + plus] >= self.Channels[channel][index + plus - 1]:
+                    asc_counter += 1
             
-        # if maxvalue < 0:
-            # onset = onset * -1
-            # while time > int(self.NumberOfLines / Slider_Mid):
-                # if self.Channels[channel][time] >= onset:
-                    # return (self.Time[time], onset) # does he want an estimated time or the nearest time in the data?
-                # time -= 1
-        # else:
-            # while time > int(self.NumberOfLines / Slider_Mid):
-                # if self.Channels[channel][time] <= onset:
-                    # return (self.Time[time], onset)
-                # time -= 1
-        return last_onset        
-
-    def slopeonsetpeak(self, channel):
-        p = self.peak(channel)[1]
-        pt = self.Time[self.peak(channel)[0]]
-        o = self.onset(channel)[1]
-        ot = self.onset(channel)[0]
+            desc_counter = 0
+            for plus in range(total):
+                if self.Channels[channel][index + plus] <= self.Channels[channel][index + plus - 1]:
+                    desc_counter += 1              
+            
+            if (asc_counter >= portion):
+                #print("found a good ascending:", self.Time[index])
+                onset = self.Time[index]   
+                break    
+            elif (desc_counter >= portion):
+                #print("found a good descending:", self.Time[index])
+                onset = self.Time[index]   
+                break
+            #else:
+                #print(self.Time[index], "only got ", (asc_counter if asc_counter > desc_counter else desc_counter))
+                    
+        return onset
+    
+    
+    def onset(self, channel, StandardDeviation):
+        OnsetPoint = self.DeviationMultiplier * StandardDeviation
         
-        try:
-            slope = ((p - o) / (pt - ot))
-        except:
-            slope = "(?)" # An error is caused when the slope is undefined (peak and onset are on the same point...?)
-        finally:
-            return slope
+        possible_onsets = []
+
+        #print("Checking channel", channel)
+        for index in (range(self.msToTimeIndex(self.OnsetStart), self.msToTimeIndex(self.OnsetEnd))):
+            if (self.Channels[channel][index] >= OnsetPoint and self.Channels[channel][index+1] <= OnsetPoint) or (self.Channels[channel][index] <= OnsetPoint and self.Channels[channel][index+1] >= OnsetPoint) or (self.Channels[channel][index] >= (-1*OnsetPoint) and self.Channels[channel][index+1] <= (-1*OnsetPoint)) or (self.Channels[channel][index] <= (-1*OnsetPoint) and self.Channels[channel][index+1] >= (-1*OnsetPoint)):
+                #possible_onsets.insert(0,index)
+                possible_onsets.append(index)
+                #print(self.Time[index],":", OnsetPoint, "is between", self.Channels[channel][index], "and", self.Channels[channel][index+1])
+        
+        for number in range(3):
+            onset = self.onsetHelper(channel, possible_onsets, 30, (25 - (4*number)))
+            if onset != "(?)":
+                break
+                  
+        #print(onset,"determined as the onset") 
+        #print("CHANNEL", channel,"WINNER:", onset)   
+        #print("\n" * 4)           
+        return onset        
+
+    def greatestslope(self, channel):
+        # p = self.peak(channel)[1]
+        # pt = self.Time[self.peak(channel)[0]]
+        # o = self.onset(channel)[1]
+        # ot = self.onset(channel)[0]
+        
+        # try:
+            # slope = ((p - o) / (pt - ot))
+        # except:
+            # slope = "(?)" # An error is caused when the slope is undefined (peak and onset are on the same point...?)
+        # finally:
+        return None
 
     def emptyChannelsDict(self):
         return {x+1:0.0 for x in range(self.NumberOfChannels)}
@@ -162,9 +176,9 @@ class DataProcessor:
             self.OnsetLatency[channel] = self.onset(channel, StandardDeviation)
             if (self.OnsetLatency[channel] != "(?)"):
                 ThisOnset = self.OnsetLatency[channel]
-                self.InitialPeak[channel] = self.peak(channel, ThisOnset, ThisOnset + self.PlusInitialPeak)
-                self.MaxPeak[channel] = self.peak(channel, ThisOnset, ThisOnset + self.PlusMaxPeak)
-                #self.InitialMaxSlope[channel] = self.slopeonsetpeak(channel)
+                self.InitialPeak[channel] = self.peak(channel, ThisOnset, ThisOnset + self.PlusInitialPeak)[0]
+                self.MaxPeak[channel] = self.peak(channel, ThisOnset, ThisOnset + self.PlusMaxPeak)[0]
+                #self.InitialMaxSlope[channel] = self.greatestslope(channel)
                  
     def getOnsetLatency(self):
         return self.OnsetLatency

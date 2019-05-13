@@ -1,6 +1,7 @@
 import datetime
 import os
 import sys
+import subprocess
 from pathlib import Path
 import traceback
 import axographio
@@ -53,8 +54,12 @@ def changeWhenHovered(widget, color, event):
         widget["fg"] = color
         widget["cursor"] = "hand2"
 
-def valueRound(f):
-    return '{:.3f}'.format(round(f, 3))
+def openFile(filename):
+    if sys.platform == "win32":
+        os.startfile(filename)
+    else:
+        opener ="open" if sys.platform == "darwin" else "xdg-open"
+        subprocess.call([opener, filename])
 
 class DataProcessorGUI:    
 
@@ -112,19 +117,10 @@ class DataProcessorGUI:
             self.view.grid(row=0, column=6, sticky=W+E, padx=3)
             self.view['state'] = DISABLED
             
-
-            
             self.taskbar.pack(fill = X, pady = (5,0))
 
         # Settings Section 1
         if (True):
-            # Checkbutton for destination
-            # self.check = Frame(self.root)
-            # self.check.columnconfigure(0, weight = 1)
-            # self.UseLastDirectory = IntVar(value=1)
-            # Checkbutton(self.check, text = "Export directly into source folder", variable = self.UseLastDirectory, command = self.SelectOutputMethod).grid(row = 0, column = 2, sticky = E, padx = 2)
-            # self.check.pack(fill = X, padx = 2)
-            
             # Border
             self.border = Frame(self.root, bg = "gray", height = 1)
             self.border.pack(fill = X, pady = 10)
@@ -147,12 +143,9 @@ class DataProcessorGUI:
             
             self.srctext = Label(self.files, text="")
             self.srctext.grid(row=2, column=1, sticky=W)
-            self.srctext.bind("<Button-1>", lambda e: os.startfile(self.srctext["text"]))
-            #self.inputtext.bind("<Button-1>", lambda e: os.startfile("D:\Some AXGR Files\has a problem with v3.txt"))
+            self.srctext.bind("<Button-1>", lambda e: openFile(self.srctext["text"]))
             self.srctext.bind("<Enter>", partial(changeWhenHovered, self.srctext, "blue"))
             self.srctext.bind("<Leave>", partial(changeWhenHovered, self.srctext, "black"))
-            
-            
             
             self.files.pack(fill = X, padx = 8, pady = (0, 10))
             
@@ -258,7 +251,7 @@ class DataProcessorGUI:
             self.output.columnconfigure(0, weight=1)
             
             # Output - Content
-            self.consoletext = Label(self.output, text="", padx = 0, pady = 3, fg="gray", font=("TkDefaultFont", 8))
+            self.consoletext = Label(self.output, text="", padx = 0, pady = 3, fg="black", font=("TkDefaultFont", 8))
             self.consoletext.grid(row=0, column=0, sticky=W+E) 
 
             self.output.pack(fill = X, pady = (7, 0))   
@@ -314,7 +307,7 @@ class DataProcessorGUI:
         self.Processor = DataProcessor()
         
         self.inputtext['text'] = self.InputFileName[self.InputFileName.rfind('/')+1:] # change input file text to the current file"
-        self.inputtext.bind("<Button-1>", lambda e: os.startfile(self.InputFileName))
+        self.inputtext.bind("<Button-1>", lambda e: openFile(self.InputFileName))
         self.srctext['text'] = self.DefaultDirectory
         self.GUIPrint("") # clear console
 
@@ -407,6 +400,11 @@ class DataProcessorGUI:
         TextField.insert(0, Value)
         TextField['state'] = DISABLED
 
+    def ValidateSliders(self):
+        if (self.BaselineStart < self.BaselineEnd) and (self.OnsetStart < self.OnsetEnd) and (self.BaselineEnd <= self.OnsetStart):
+            return True
+        return False    
+        
     def Export(self):
         if self.ValidateSliders():
             self.Processor.Process(self.BaselineStart, self.BaselineEnd, self.OnsetStart, self.OnsetEnd, self.DeviationMultiplier, self.PlusInitialPeak, self.PlusMaxPeak, self.PlusMaxSlope, self.RegressionPoints)
@@ -421,15 +419,18 @@ class DataProcessorGUI:
                 self.OutputExcelFile = self.InitXLSX()
                 if (self.OutputExcelFile == None):
                     return False
-                # Call a self.function() appending the contents of the current self.Processor to the end of the excel file
+                # Create sheets in the excel file
                 OnsetSheet = self.CreateXLSXSheet("Onset Latency")
                 InitialPeakSheet = self.CreateXLSXSheet("Initial Peak")
-                MaxPeakSheet = self.CreateXLSXSheet("Max Peak")          
+                MaxPeakSheet = self.CreateXLSXSheet("Max Peak") 
+                # Call a self.function() appending the contents of the current self.Processor to the end of the excel file                
                 self.OutputToXLSX(OnsetSheet, self.Processor.getOnsetLatency())
                 self.OutputToXLSX(InitialPeakSheet, self.Processor.getInitialPeak())
                 self.OutputToXLSX(MaxPeakSheet, self.Processor.getMaxPeak())
                 # Close the excel file  
-                self.CloseXLSX()
+                self.OutputExcelFile.close() 
+                print(self.OutputFileName + " created in source folder subdirectory.")
+                self.GUIPrint(self.OutputFileName + " created in source folder subdirectory.")
             self.view['command'] = self.ViewFile
             self.view['state'] = NORMAL
 
@@ -438,7 +439,7 @@ class DataProcessorGUI:
         
     def ExportDir(self):
         if self.ValidateSliders():
-            message = "Process all .AXGR and .ATF files in " + self.DefaultDirectory + " with the variables inputted? (This will overwrite any prexisting reports of those files in the output folder)"
+            message = "Process all .AXGR and .ATF files in " + self.DefaultDirectory + " with the variables inputted? This will overwrite any prexisting reports of those files in the output folder."
             MsgBox = messagebox.askquestion("Process all files?", message)
             if (MsgBox == 'no'):
                 return False
@@ -449,17 +450,19 @@ class DataProcessorGUI:
     
     def ExportDirThread(self):
         if self.OutputFileType == ".xlsx":
+            # Create an excel file
             self.OutputExcelFile = self.InitXLSX()
             if (self.OutputExcelFile == None):  
                 return False
+            # Create sheets in the excel file    
             OnsetSheet = self.CreateXLSXSheet("Onset Latency")
             InitialPeakSheet = self.CreateXLSXSheet("Initial Peak")
             MaxPeakSheet = self.CreateXLSXSheet("Max Peak")
+            
         self.root['cursor'] = "watch"    
         column_counter = 0
         for possible_file in sorted(os.listdir(self.DefaultDirectory)):
             if (not os.path.isdir(self.DefaultDirectory + SLASH + possible_file)) and (getFileExt(possible_file) == ".atf" or getFileExt(possible_file) == ".axgr"): 
-                
                 self.InputFileName = (self.DefaultDirectory + '/' + possible_file)
                 self.Processor = DataProcessor()
                 self.Processor.Extract(self.InputFileName)
@@ -471,29 +474,36 @@ class DataProcessorGUI:
                 if (self.OutputFileType == ".txt"):
                     self.OutputToTxt();                                   
                     self.view['command'] = self.ViewDir
+                    outputtitle = "source folder subdirectory."
                 elif (self.OutputFileType == ".xlsx"):
                     column_counter += 1
+                    print("Processing " + self.InputFileName[self.InputFileName.rfind('/')+1:self.InputFileName.find(".")])
+                    self.GUIPrint("Processing " + self.InputFileName[self.InputFileName.rfind('/')+1:self.InputFileName.find(".")])
+                    # Call a self.function() appending the contents of the current self.Processor to the end of the excel file   
                     self.OutputToXLSX(OnsetSheet, self.Processor.getOnsetLatency(), column_counter)
                     self.OutputToXLSX(InitialPeakSheet, self.Processor.getInitialPeak(), column_counter)
                     self.OutputToXLSX(MaxPeakSheet, self.Processor.getMaxPeak(), column_counter)
+                    
+                    outputtitle = self.OutputFileName
                     self.view['command'] = self.ViewFile
-
                 self.view['state'] = NORMAL
                 
-        if self.OutputFileType == ".xlsx":        
-            self.CloseXLSX() 
-        self.GUIPrint("All files processed into source folder subdirectory.")  
+        if self.OutputFileType == ".xlsx":  
+            # Close the excel file          
+            self.OutputExcelFile.close()   
+        self.GUIPrint("All files processed into " + outputtitle)  
+        print("All files processed into " + outputtitle)  
         self.root['cursor'] = ""    
     
     def ViewDir(self):
         if os.path.isdir(self.OutputDirectory):
-            os.startfile(self.OutputDirectory)
+            openFile(self.OutputDirectory)
         else:
             self.GUIPrint(self.OutputDirectory + " can't been found.")
         
     def ViewFile(self):
         if os.path.isfile(self.OutputDirectory + SLASH + self.OutputFileName):
-            os.startfile(self.OutputDirectory + SLASH + self.OutputFileName)
+            openFile(self.OutputDirectory + SLASH + self.OutputFileName)
         else:
             self.GUIPrint(self.OutputFileName + " has been deleted.")
 
@@ -505,7 +515,7 @@ class DataProcessorGUI:
                 os.makedirs(self.OutputDirectory)
                  
             # Make output file name     
-            self.OutputFileName = "Weiner Report 13.xlsx"
+            self.OutputFileName = "[Report Name].xlsx"
             oname = self.OutputDirectory + SLASH + self.OutputFileName
             
             # Open and initialize file
@@ -518,55 +528,28 @@ class DataProcessorGUI:
             return None
 
     def CreateXLSXSheet(self, name):
+        bold = self.OutputExcelFile.add_format({'bold': True})
         this_sheet = self.OutputExcelFile.add_worksheet(name)
-        this_sheet.write(0, 0, "Channels")
-        for num in range(self.Processor.getNumberOfChannels()):
-            this_sheet.write(num+1, 0, num+1)
+        this_sheet.write(0, 0, "Channels", bold)
+        for num in range(self.Processor.getNumberOfChannels()): # only gets # of channels for the first file
+            this_sheet.write(num+1, 0, num+1, bold)
         
         return this_sheet
     
-    
-    def OutputToXLSX(self, this_sheet, dictionary, column_counter=1): 
-
+    def OutputToXLSX(self, this_sheet, dictionary, column_counter=1, units="ms"): 
         counter = 1
-        this_sheet.write(0, column_counter, self.InputFileName[self.InputFileName.rfind('/')+1:self.InputFileName.find(".")])
+        bold = self.OutputExcelFile.add_format({'bold': True})
+        round = self.OutputExcelFile.add_format({'num_format': '0.000'})
+        this_sheet.set_column(column_counter, column_counter, 15)
+        this_sheet.write(0, column_counter, self.InputFileName[self.InputFileName.rfind('/')+1:self.InputFileName.find(".")], bold)
         for channelitem in dictionary:
             value = dictionary[channelitem]
             if value != "(?)" and value != 0:
-                this_sheet.write(counter, column_counter, round(value, 2))
+                this_sheet.write(counter, column_counter, value, round) #round(value, 3)
             counter += 1
-        # x=1
-        # y=2
-        # z=3
-
-        # list1=[2.34,4.346,4.234]
-
-        # this_sheet.write(0, 0, "Display")
-        # this_sheet.write(1, 0, "Dominance")
-        # this_sheet.write(2, 0, "Test")
-
-        # this_sheet.write(0, 1, x)
-        # this_sheet.write(1, 1, y)
-        # this_sheet.write(2, 1, z)
-
-        # this_sheet.write(4, 0, "Stimulus Time")
-        # this_sheet.write(4, 1, "Wacktion Time")
-
-        # i=4
-
-        # for n in list1:
-            # i = i+1
-            # this_sheet.write(i, 0, n)
         
         self.GUIPrint("Processing " + self.InputFileName[self.InputFileName.rfind('/')+1:self.InputFileName.find(".")])
-        print("Adding " + this_sheet.get_name() + " to " + self.InputFileName[self.InputFileName.rfind('/')+1:self.InputFileName.find(".")])
         
-            
-    def CloseXLSX(self):
-        self.OutputExcelFile.close()  
-        print(self.OutputFileName + " created in source folder subdirectory.")
-        self.GUIPrint(self.OutputFileName + " created in source folder subdirectory.")
-
     def OutputToTxt(self):
         # Make output directory if it doesn't already exist
         self.OutputDirectory = self.DefaultDirectory + SLASH + self.Name + " Outputs"
@@ -598,11 +581,6 @@ class DataProcessorGUI:
             outputfile.write(str(channel) + ": " + str(OutputDict[channel]) + "\n")
         outputfile.write("\n")  
      
-    def ValidateSliders(self):
-        if (self.BaselineStart < self.BaselineEnd) and (self.OnsetStart < self.OnsetEnd) and (self.BaselineEnd <= self.OnsetStart):
-            return True
-        return False    
-        
     def BaselineStartEnter(self, event):
         try:
             f = float(self.BaselineStartField.get())

@@ -1,0 +1,62 @@
+012519 094_csd.axgr :  measure peaks  
+
+Episode # 1
+Peak Channel 1 (mV/mm^2)	Location  (ms)	Onset  (ms)
+-0.926225	129.83	124.476
+
+Episode # 2
+Peak Channel 1 (mV/mm^2)	Location  (ms)	Onset  (ms)
+0.775859	128.822	124.632
+
+Episode # 3
+Peak Channel 1 (mV/mm^2)	Location  (ms)	Onset  (ms)
+1.26159	126.403	123.591
+
+Episode # 4
+Peak Channel 1 (mV/mm^2)	Location  (ms)	Onset  (ms)
+0.957715	118.037	117.127
+
+Episode # 5
+Peak Channel 1 (mV/mm^2)	Location  (ms)	Onset  (ms)
+-0.769053	118.138	117.068
+-0.696553	120.154	117.066
+-0.752803	126.504	125.191
+
+Episode # 6
+Peak Channel 1 (mV/mm^2)	Location  (ms)	Onset  (ms)
+1.1114	127.915	119.909
+
+Episode # 7
+Peak Channel 1 (mV/mm^2)	Location  (ms)	Onset  (ms)
+-1.66091	127.915	111.836
+
+Episode # 8
+Peak Channel 1 (mV/mm^2)	Location  (ms)	Onset  (ms)
+1.57202	117.734	107.18
+
+Episode # 9
+Peak Channel 1 (mV/mm^2)	Location  (ms)	Onset  (ms)
+-0.499646	109.166	105.639
+
+Episode # 10
+Peak Channel 1 (mV/mm^2)	Location  (ms)	Onset  (ms)
+-0.475177	115.517	114.716
+-0.478927	116.928	114.717
+
+Episode # 11
+Peak Channel 1 (mV/mm^2)	Location  (ms)	Onset  (ms)
+0.643245	116.726	115.214
+
+Episode # 12
+Peak Channel 1 (mV/mm^2)	Location  (ms)	Onset  (ms)
+0.845808	121.464	120.473
+0.775808	128.923	120.471
+
+Episode # 13
+Peak Channel 1 (mV/mm^2)	Location  (ms)	Onset  (ms)
+-1.19176	107.352	103.863
+-1.18926	110.376	103.863
+
+Episode # 14
+Peak Channel 1 (mV/mm^2)	Location  (ms)	Onset  (ms)
+-0.627551	125.395	124.603
