@@ -115,7 +115,6 @@ class DataProcessor:
                     
         return onset
     
-    
     def onset(self, channel, StandardDeviation):
         OnsetPoint = self.DeviationMultiplier * StandardDeviation
         
@@ -149,7 +148,7 @@ class DataProcessor:
         # except:
             # slope = "(?)" # An error is caused when the slope is undefined (peak and onset are on the same point...?)
         # finally:
-        return None
+        return 666
 
     def emptyChannelsDict(self):
         return {x+1:0.0 for x in range(self.NumberOfChannels)}
@@ -168,6 +167,7 @@ class DataProcessor:
         self.OnsetLatency = self.emptyChannelsDict()
         self.InitialPeak = self.emptyChannelsDict()
         self.MaxPeak = self.emptyChannelsDict()
+        self.MaxLPeak = self.emptyChannelsDict()
         self.InitialMaxSlope = self.emptyChannelsDict()
         
         for i in range(self.NumberOfChannels):
@@ -176,10 +176,12 @@ class DataProcessor:
             self.OnsetLatency[channel] = self.onset(channel, StandardDeviation)
             if (self.OnsetLatency[channel] != "(?)"):
                 ThisOnset = self.OnsetLatency[channel]
-                self.InitialPeak[channel] = self.peak(channel, ThisOnset, ThisOnset + self.PlusInitialPeak)[0]
-                self.MaxPeak[channel] = self.peak(channel, ThisOnset, ThisOnset + self.PlusMaxPeak)[0]
-                #self.InitialMaxSlope[channel] = self.greatestslope(channel)
-                 
+                self.InitialPeak[channel] = self.peak(channel, ThisOnset, ThisOnset + self.PlusInitialPeak)[1]
+                MaxPeakStuff = self.peak(channel, ThisOnset, ThisOnset + self.PlusMaxPeak)
+                self.MaxPeak[channel] = MaxPeakStuff[1]
+                self.MaxLPeak[channel] = MaxPeakStuff[0]
+                self.InitialMaxSlope[channel] = self.greatestslope(channel)
+              
     def getOnsetLatency(self):
         return self.OnsetLatency
         
@@ -187,7 +189,13 @@ class DataProcessor:
         return self.InitialPeak
 
     def getMaxPeak(self):
-        return self.MaxPeak        
+        return self.MaxPeak   
+
+    def getMaxLPeak(self):
+        return self.MaxLPeak
+    
+    def getMaxSlope(self):
+        return self.InitialMaxSlope    
 
     def getInitialMaxSlope(self):
         return self.InitialMaxSlope  

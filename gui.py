@@ -30,7 +30,7 @@ elif (sys.platform == 'darwin'):
     print(__file__, "running on Mac.")
     SLASH = "/";
 
-# CONFIG FILE
+# CONFIG FILE?
 GRAPH = False
 PERCENTAGE1 = .3
 PERCENTAGE2 = .3333333
@@ -297,6 +297,7 @@ class DataProcessorGUI:
         
         if (self.DefaultDirectory == self.root) or (Path(self.DefaultDirectory).is_dir() == False):
             self.DefaultDirectory = self.root
+            
         self.root.filename = filedialog.askopenfilename(initialdir = self.DefaultDirectory, title = "Open file to process", filetypes = (("AXGR Files","*.axgr"), ("ATF Files","*.atf"))) # Pop-up window to choose a file to process  
         if (getFileExt(self.root.filename) != ".axgr") and (getFileExt(self.root.filename) != ".atf"):
             return False # end the function if they pressed cancel
@@ -400,13 +401,13 @@ class DataProcessorGUI:
         TextField.insert(0, Value)
         TextField['state'] = DISABLED
 
-    def ValidateSliders(self):
+    def ValidateInputs(self):
         if (self.BaselineStart < self.BaselineEnd) and (self.OnsetStart < self.OnsetEnd) and (self.BaselineEnd <= self.OnsetStart):
             return True
         return False    
         
     def Export(self):
-        if self.ValidateSliders():
+        if self.ValidateInputs():
             self.Processor.Process(self.BaselineStart, self.BaselineEnd, self.OnsetStart, self.OnsetEnd, self.DeviationMultiplier, self.PlusInitialPeak, self.PlusMaxPeak, self.PlusMaxSlope, self.RegressionPoints)
             
             if GRAPH == True:
@@ -420,13 +421,17 @@ class DataProcessorGUI:
                 if (self.OutputExcelFile == None):
                     return False
                 # Create sheets in the excel file
-                OnsetSheet = self.CreateXLSXSheet("Onset Latency")
-                InitialPeakSheet = self.CreateXLSXSheet("Initial Peak")
-                MaxPeakSheet = self.CreateXLSXSheet("Max Peak") 
+                OnsetSheet = self.CreateXLSXSheet("Response Onset Latency")
+                InitialPeakSheet = self.CreateXLSXSheet("Initial Peak Amplitude")
+                MaxPeakSheet = self.CreateXLSXSheet("Max Peak Amplitude") 
+                MaxPeakLSheet = self.CreateXLSXSheet("Max Peak Latency") 
+                MaxSlopeSheet = self.CreateXLSXSheet("Initial Max Slope") 
                 # Call a self.function() appending the contents of the current self.Processor to the end of the excel file                
                 self.OutputToXLSX(OnsetSheet, self.Processor.getOnsetLatency())
                 self.OutputToXLSX(InitialPeakSheet, self.Processor.getInitialPeak())
                 self.OutputToXLSX(MaxPeakSheet, self.Processor.getMaxPeak())
+                self.OutputToXLSX(MaxPeakLSheet, self.Processor.getMaxLPeak())
+                self.OutputToXLSX(MaxSlopeSheet, self.Processor.getMaxSlope())
                 # Close the excel file  
                 self.OutputExcelFile.close() 
                 print(self.OutputFileName + " created in source folder subdirectory.")
@@ -438,7 +443,7 @@ class DataProcessorGUI:
             self.GUIPrint("Slider values are not logical.")
         
     def ExportDir(self):
-        if self.ValidateSliders():
+        if self.ValidateInputs():
             message = "Process all .AXGR and .ATF files in " + self.DefaultDirectory + " with the variables inputted? This will overwrite any prexisting reports of those files in the output folder."
             MsgBox = messagebox.askquestion("Process all files?", message)
             if (MsgBox == 'no'):
@@ -455,9 +460,11 @@ class DataProcessorGUI:
             if (self.OutputExcelFile == None):  
                 return False
             # Create sheets in the excel file    
-            OnsetSheet = self.CreateXLSXSheet("Onset Latency")
-            InitialPeakSheet = self.CreateXLSXSheet("Initial Peak")
-            MaxPeakSheet = self.CreateXLSXSheet("Max Peak")
+            OnsetSheet = self.CreateXLSXSheet("Response Onset Latency")
+            InitialPeakSheet = self.CreateXLSXSheet("Initial Peak Amplitude")
+            MaxPeakSheet = self.CreateXLSXSheet("Max Peak Amplitude") 
+            MaxPeakLSheet = self.CreateXLSXSheet("Max Peak Latency") 
+            MaxSlopeSheet = self.CreateXLSXSheet("Initial Max Slope") 
             
         self.root['cursor'] = "watch"    
         column_counter = 0
@@ -483,6 +490,8 @@ class DataProcessorGUI:
                     self.OutputToXLSX(OnsetSheet, self.Processor.getOnsetLatency(), column_counter)
                     self.OutputToXLSX(InitialPeakSheet, self.Processor.getInitialPeak(), column_counter)
                     self.OutputToXLSX(MaxPeakSheet, self.Processor.getMaxPeak(), column_counter)
+                    self.OutputToXLSX(MaxPeakLSheet, self.Processor.getMaxLPeak(), column_counter)
+                    self.OutputToXLSX(MaxSlopeSheet, self.Processor.getMaxSlope(), column_counter)
                     
                     outputtitle = self.OutputFileName
                     self.view['command'] = self.ViewFile
@@ -539,7 +548,7 @@ class DataProcessorGUI:
     def OutputToXLSX(self, this_sheet, dictionary, column_counter=1, units="ms"): 
         counter = 1
         bold = self.OutputExcelFile.add_format({'bold': True})
-        round = self.OutputExcelFile.add_format({'num_format': '0.000'})
+        round = self.OutputExcelFile.add_format({'num_format': '0.0000'})
         this_sheet.set_column(column_counter, column_counter, 15)
         this_sheet.write(0, column_counter, self.InputFileName[self.InputFileName.rfind('/')+1:self.InputFileName.find(".")], bold)
         for channelitem in dictionary:
@@ -566,9 +575,10 @@ class DataProcessorGUI:
         outputfile.write(str(self.Processor.getNumberOfLines()) + " datapoints, " + str(self.Processor.getNumberOfChannels()) + " channels." + "\n\n")
       
         self.OutputToTxtWrite(outputfile, "Onset Latency", self.Processor.getOnsetLatency())
-        self.OutputToTxtWrite(outputfile, ("Initial Peak (+ " + str(self.PlusInitialPeak) + " ms)"), self.Processor.getInitialPeak())
-        self.OutputToTxtWrite(outputfile, ("Max Peak (+ " + str(self.PlusMaxPeak) + " ms)"), self.Processor.getMaxPeak())
-        #self.OutputToTxtWrite(outputfile, ("Max Initial Slope (+ " + str(self.PlusMaxSlope) + " ms)"), self.Processor.getMaxPeak())
+        self.OutputToTxtWrite(outputfile, ("Initial Peak Amplitude (+ " + str(self.PlusInitialPeak) + " ms)"), self.Processor.getInitialPeak())
+        self.OutputToTxtWrite(outputfile, ("Max Peak Amplitude (+ " + str(self.PlusMaxPeak) + " ms)"), self.Processor.getMaxPeak())
+        self.OutputToTxtWrite(outputfile, ("Max Peak Latency (+ " + str(self.PlusMaxPeak) + " ms)"), self.Processor.getMaxLPeak())
+        self.OutputToTxtWrite(outputfile, ("Initial Max Slope (+ " + str(self.PlusMaxSlope) + " ms)"), self.Processor.getMaxSlope())
         
         outputfile.close() #print(oname[oname.rfind("\\")+1:] + " created.")
         

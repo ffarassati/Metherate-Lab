@@ -1,0 +1,10 @@
+Is onset reasonable? It's always within 4-5ms of the value from axograph, especially for channels 1-6. After that, it's less balanced.
+
+How to do initial max slope again?
+
+
+What should the output xlsx file be called? Should I allow the user to decide that? Is there a general name I can derive from the data? Is this a guaranteed available name?
+
+Any other preferences?
+
+How to deploy to other people? From flashdrives? Github (doesn't guarantee version or dependencies or anything, unless I create an .exe)? Create installer?
