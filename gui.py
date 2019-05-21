@@ -79,6 +79,7 @@ class DataProcessorGUI:
         self.Canvas = "None"
         self.Directory = ""
         self.DefaultDirectory = self.root
+        self.OutputDirectory = str(self.root)
 
         # Taskbar Row
         if (True):
@@ -298,7 +299,7 @@ class DataProcessorGUI:
         if (self.DefaultDirectory == self.root) or (Path(self.DefaultDirectory).is_dir() == False):
             self.DefaultDirectory = self.root
             
-        self.root.filename = filedialog.askopenfilename(initialdir = self.DefaultDirectory, title = "Open file to process", filetypes = (("AXGR Files","*.axgr"), ("ATF Files","*.atf"))) # Pop-up window to choose a file to process  
+        self.root.filename = filedialog.askopenfilename(initialdir = self.DefaultDirectory, title = "Choose single file to process", filetypes = (("AXGR Files","*.axgr"), ("ATF Files","*.atf"))) # Pop-up window to choose a file to process  
         if (getFileExt(self.root.filename) != ".axgr") and (getFileExt(self.root.filename) != ".atf"):
             return False # end the function if they pressed cancel
 
@@ -331,7 +332,7 @@ class DataProcessorGUI:
         if (self.DefaultDirectory == self.root) or (Path(self.DefaultDirectory).is_dir() == False):
             self.DefaultDirectory = self.root
 
-        directory = filedialog.askdirectory(initialdir = self.DefaultDirectory)
+        directory = filedialog.askdirectory(initialdir = self.DefaultDirectory, title = "Choose folder from which to process")
 
         try:
             for i in sorted(os.listdir(directory)):
@@ -403,11 +404,40 @@ class DataProcessorGUI:
 
     def ValidateInputs(self):
         if (self.BaselineStart < self.BaselineEnd) and (self.OnsetStart < self.OnsetEnd) and (self.BaselineEnd <= self.OnsetStart):
-            return True
-        return False    
+            if (self.RegressionPoints <= (self.PlusMaxSlope * 10)):
+                return True
+        return False  
+
+    def OutputFolderChoose(self):
+        dir = filedialog.askdirectory(initialdir = self.OutputDirectory, title = "Choose folder to store reports in")
+        if (dir != ""): # The user chose a folder
+            self.OutputDirectory = dir 
+            self.GUIPrint("Output folder changed: " + self.OutputDirectory )
+            print("Output folder changed: " + self.OutputDirectory )
+            self.export.bind('<Button-3>', self.OutputFolderChange) 
+            return True;
+        else: # The user selected cancel
+            print("No output folder chosen.")
+            self.GUIPrint("ERROR: Please choose a folder to store processing reports to complete the processing.")
+            return False
         
+    def OutputFolderCheck(self):
+        if (self.OutputDirectory == str(self.root)) or (Path(self.OutputDirectory).is_dir() == False):
+            self.OutputDirectory = str(self.root)
+            return self.OutputFolderChoose()
+        return True;
+    
+    def OutputFolderChange(self, event):
+        MsgBox = messagebox.askquestion("Change output folder?", "Would you like to change the folder to which the reports are being saved?")
+        if (MsgBox == 'no'):
+            return False
+        else:
+            self.OutputFolderChoose()
+                        
     def Export(self):
         if self.ValidateInputs():
+            if not self.OutputFolderCheck():
+                return None;
             self.Processor.Process(self.BaselineStart, self.BaselineEnd, self.OnsetStart, self.OnsetEnd, self.DeviationMultiplier, self.PlusInitialPeak, self.PlusMaxPeak, self.PlusMaxSlope, self.RegressionPoints)
             
             if GRAPH == True:
@@ -417,7 +447,7 @@ class DataProcessorGUI:
                 self.OutputToTxt(); 
             elif (self.OutputFileType == ".xlsx"):
                 # Create an excel file
-                self.OutputExcelFile = self.InitXLSX()
+                self.OutputExcelFile = self.InitXLSX(self.InputFileName[self.InputFileName.rfind('/')+1:] + " Report")
                 if (self.OutputExcelFile == None):
                     return False
                 # Create sheets in the excel file
@@ -440,10 +470,12 @@ class DataProcessorGUI:
             self.view['state'] = NORMAL
 
         else:
-            self.GUIPrint("Slider values are not logical.")
+            self.GUIPrint("ERROR: Slider values are not logical.")
         
     def ExportDir(self):
         if self.ValidateInputs():
+            if not self.OutputFolderCheck():
+                return None;
             message = "Process all .AXGR and .ATF files in " + self.DefaultDirectory + " with the variables inputted? This will overwrite any prexisting reports of those files in the output folder."
             MsgBox = messagebox.askquestion("Process all files?", message)
             if (MsgBox == 'no'):
@@ -451,12 +483,12 @@ class DataProcessorGUI:
             else:
                 threading.Thread(target=self.ExportDirThread).start() 
         else:
-            self.GUIPrint("Slider values are not logical.")
+            self.GUIPrint("ERROR: Slider values are not logical.")
     
     def ExportDirThread(self):
         if self.OutputFileType == ".xlsx":
             # Create an excel file
-            self.OutputExcelFile = self.InitXLSX()
+            self.OutputExcelFile = self.InitXLSX(self.DefaultDirectory[self.DefaultDirectory.rfind("/")+1:] + " Report")
             if (self.OutputExcelFile == None):  
                 return False
             # Create sheets in the excel file    
@@ -508,32 +540,33 @@ class DataProcessorGUI:
         if os.path.isdir(self.OutputDirectory):
             openFile(self.OutputDirectory)
         else:
-            self.GUIPrint(self.OutputDirectory + " can't been found.")
+            self.GUIPrint("ERROR: " + self.OutputDirectory + " can't been found.")
         
     def ViewFile(self):
         if os.path.isfile(self.OutputDirectory + SLASH + self.OutputFileName):
             openFile(self.OutputDirectory + SLASH + self.OutputFileName)
         else:
-            self.GUIPrint(self.OutputFileName + " has been deleted.")
+            self.GUIPrint("ERROR: " + self.OutputFileName + " has been deleted.")
 
-    def InitXLSX(self):
-        try:
-            # Make output directory if it doesn't already exist
-            self.OutputDirectory = self.DefaultDirectory + SLASH + self.Name + " Outputs"
-            if not os.path.exists(self.OutputDirectory):
-                os.makedirs(self.OutputDirectory)
-                 
+    def InitXLSX(self, name):
+        try:                
             # Make output file name     
-            self.OutputFileName = "[Report Name].xlsx"
+            self.OutputFileName = name + ".xlsx"
             oname = self.OutputDirectory + SLASH + self.OutputFileName
             
             # Open and initialize file
-            if os.path.isfile(oname):
-                os.remove(oname)
+            counter = 1
+            while True:
+                if os.path.isfile(oname):
+                    counter += 1
+                    self.OutputFileName = name + " (" + str(counter) + ").xlsx"
+                    oname = self.OutputDirectory + SLASH + self.OutputFileName
+                else:
+                    break
             
             return xlsxwriter.Workbook(oname)  
         except PermissionError as e:
-            self.GUIPrint(self.OutputFileName + " in use; can't be modified.")
+            self.GUIPrint("ERROR: " + self.OutputFileName + " in use; can't be modified.")
             return None
 
     def CreateXLSXSheet(self, name):
@@ -560,11 +593,6 @@ class DataProcessorGUI:
         self.GUIPrint("Processing " + self.InputFileName[self.InputFileName.rfind('/')+1:self.InputFileName.find(".")])
         
     def OutputToTxt(self):
-        # Make output directory if it doesn't already exist
-        self.OutputDirectory = self.DefaultDirectory + SLASH + self.Name + " Outputs"
-        if not os.path.exists(self.OutputDirectory):
-            os.makedirs(self.OutputDirectory)
-        
         # Make output file name
         self.OutputFileName = self.InputFileName[self.InputFileName.rfind('/')+1:self.InputFileName.find(".")] + " Report.txt"  
         oname = self.OutputDirectory + SLASH + self.OutputFileName
@@ -582,8 +610,8 @@ class DataProcessorGUI:
         
         outputfile.close() #print(oname[oname.rfind("\\")+1:] + " created.")
         
-        print(self.OutputFileName + " created in source folder subdirectory.")
-        self.GUIPrint(self.OutputFileName + " created in source folder subdirectory.")
+        print(self.OutputFileName + " created in output folder.")
+        self.GUIPrint(self.OutputFileName + " created in output folder.")
         
     def OutputToTxtWrite(self, outputfile, title, OutputDict):
         outputfile.write(title+":\n")
@@ -603,7 +631,7 @@ class DataProcessorGUI:
                 raise Exception
         except:
             #traceback.print_exc()
-            self.GUIPrint("Baseline start value not within time range.")
+            self.GUIPrint("ERROR: " + "Baseline start value not within time range.")
 
     def BaselineEndEnter(self, event):
         try:
@@ -617,7 +645,7 @@ class DataProcessorGUI:
                 raise Exception
         except:
             #traceback.print_exc()
-            self.GUIPrint("Baseline end value not within time range.")
+            self.GUIPrint("ERROR: " + "Baseline end value not within time range.")
 
     def OnsetStartEnter(self, event):
         try:
@@ -631,7 +659,7 @@ class DataProcessorGUI:
                 raise Exception
         except:
             #traceback.print_exc()
-            self.GUIPrint("Onset start value not within time range.")
+            self.GUIPrint("ERROR: " + "Onset start value not within time range.")
 
     def OnsetEndEnter(self, event):
         try:
@@ -645,7 +673,7 @@ class DataProcessorGUI:
                 raise Exception
         except:
             #traceback.print_exc()
-            self.GUIPrint("Onset start value not within time range.")
+            self.GUIPrint("ERROR: " + "Onset start value not within time range.")
 
     def InitialPeakEnter(self, event):
         try:
@@ -659,7 +687,7 @@ class DataProcessorGUI:
                 raise Exception
         except:
             #traceback.print_exc()
-            self.GUIPrint("Initial peak additive value not within time range.")
+            self.GUIPrint("ERROR: " + "Initial peak additive value not within time range.")
 
     def MaxPeakEnter(self, event):
         try:
@@ -673,7 +701,7 @@ class DataProcessorGUI:
                 raise Exception
         except:
             #traceback.print_exc()
-            self.GUIPrint("Max peak additive value not within time range.") 
+            self.GUIPrint("ERROR: " + "Max peak additive value not within time range.") 
 
     def MaxSlopeEnter(self, event):
         try:
@@ -687,7 +715,7 @@ class DataProcessorGUI:
                 raise Exception
         except:
             #traceback.print_exc()
-            self.GUIPrint("Max slope additive value not within time range.") 
+            self.GUIPrint("ERROR: " + "Max slope additive value not within time range.") 
 
     def StdDevEnter(self, event):
         try:
@@ -701,12 +729,12 @@ class DataProcessorGUI:
                 raise Exception
         except:
             #traceback.print_exc()
-            self.GUIPrint("Standard deviation not a valid number.")
+            self.GUIPrint("ERROR: " + "Standard deviation not a valid number.")
             
     def RegressionEnter(self, event):
         try:
             f = int(self.RegressionField.get())
-            if (f > 0):
+            if (f <= (int(self.MaxSlopeField.get()) * 10)):
                 self.RegressionField['state'] = DISABLED
                 self.RegressionPoints = f
                 print("New value: ", f)
@@ -714,7 +742,7 @@ class DataProcessorGUI:
             else:
                 raise Exception
         except:
-            self.GUIPrint("Regression not a valid number.") #traceback.print_exc()
+            self.GUIPrint("ERROR: " + "Regression not a valid number (no greater than addend * 10).") #traceback.print_exc()
                
     def SelectOutputType(self, event):
         self.OutputFileType = self.ComboBox.get()

@@ -137,18 +137,32 @@ class DataProcessor:
         #print("\n" * 4)           
         return onset        
 
-    def greatestslope(self, channel):
-        # p = self.peak(channel)[1]
-        # pt = self.Time[self.peak(channel)[0]]
-        # o = self.onset(channel)[1]
-        # ot = self.onset(channel)[0]
-        
-        # try:
-            # slope = ((p - o) / (pt - ot))
-        # except:
-            # slope = "(?)" # An error is caused when the slope is undefined (peak and onset are on the same point...?)
-        # finally:
-        return 666
+    def greatestslope(self, channel, searchStart, searchEnd, RegressionPoints):
+        #print("Channel " + str(channel))
+        #print(" - ", searchStart, ":", self.msToTimeIndex(searchStart))
+        #print(" - ", searchEnd, ":", self.msToTimeIndex(searchEnd))
+        diff = self.msToTimeIndex(searchEnd) - self.msToTimeIndex(searchStart) # number of datapoints between start and end values
+        #print(" - ", diff)
+        #print(" - ", (diff / RegressionPoints))
+        current = self.msToTimeIndex(searchStart)
+        increment = diff / RegressionPoints
+        #counter = 0
+        latency = current
+        slope = 0
+        while (current < self.msToTimeIndex(searchEnd)):
+            #counter += 1
+            new = current + increment
+            #print("          ", counter, ":", self.Time[round(current)], "to", self.Time[round(new)])
+            #print("          ", counter, ":", self.Channels[channel][round(current)], "to", self.Channels[channel][round(new)])
+            s = ((self.Channels[channel][round(new)] - self.Channels[channel][round(current)]) / (self.Time[round(new)] - self.Time[round(current)]))
+            if abs(s) > abs(slope):
+                slope = s;
+                latency = self.Time[round(current)]
+                #print("          better slope!:", slope)  
+            current = new
+        #print("          max slope:", slope)
+
+        return(latency, slope)
 
     def emptyChannelsDict(self):
         return {x+1:0.0 for x in range(self.NumberOfChannels)}
@@ -180,7 +194,7 @@ class DataProcessor:
                 MaxPeakStuff = self.peak(channel, ThisOnset, ThisOnset + self.PlusMaxPeak)
                 self.MaxPeak[channel] = MaxPeakStuff[1]
                 self.MaxLPeak[channel] = MaxPeakStuff[0]
-                self.InitialMaxSlope[channel] = self.greatestslope(channel)
+                self.InitialMaxSlope[channel] = self.greatestslope(channel, ThisOnset, ThisOnset + self.PlusMaxSlope, self.RegressionPoints)[1]
               
     def getOnsetLatency(self):
         return self.OnsetLatency
