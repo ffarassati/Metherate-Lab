@@ -101,11 +101,11 @@ class DataProcessorGUI:
             self.taskbar.columnconfigure(6, weight=1)
 
             # Taskbar - Content
-            openfile = Button(master=self.taskbar, text="Choose File", command=self.OpenFile, width = 9)
+            openfile = Button(master=self.taskbar, text="Open File", command=self.OpenFile, width = 9)
             openfile.grid(row=0, column=0, sticky=W+E, padx=5)
             openfile['state'] = NORMAL
             
-            openfolder = Button(master=self.taskbar, text="Choose Folder", command=self.OpenDir, width = 11)
+            openfolder = Button(master=self.taskbar, text="Open Folder", command=self.OpenDir, width = 11)
             openfolder.grid(row=0, column=1, sticky=W+E, padx=0)
             openfolder['state'] = NORMAL
             
@@ -135,7 +135,7 @@ class DataProcessorGUI:
             
             # File Names
             self.files = Frame(self.root)
-            self.files.columnconfigure(0, weight = 1)
+            self.files.columnconfigure(0, weight = 2)
             self.files.columnconfigure(1, weight = 20)
             
             self.FileName = Label(self.files, text="File: ", padx = 2, pady = 3)
@@ -146,7 +146,7 @@ class DataProcessorGUI:
             self.inputtext.bind("<Enter>", partial(changeWhenHovered, self.inputtext, "blue", True))
             self.inputtext.bind("<Leave>", partial(changeWhenHovered, self.inputtext, "black", False))
             
-            self.FolderName = Label(self.files, text="Folder: ", padx = 2, pady = 3)
+            self.FolderName = Label(self.files, text="Source: ", padx = 2, pady = 3)
             self.FolderName.grid(row=2, column=0, sticky=W)
             
             self.srctext = Label(self.files, text="")
@@ -154,6 +154,16 @@ class DataProcessorGUI:
             self.srctext.bind("<Button-1>", lambda e: openFile(self.srctext["text"]))
             self.srctext.bind("<Enter>", partial(changeWhenHovered, self.srctext, "blue", True))
             self.srctext.bind("<Leave>", partial(changeWhenHovered, self.srctext, "black", False))
+            
+            self.DestinationName = Label(self.files, text="Destination: ", padx = 2, pady = 3)
+            self.DestinationName.grid(row=3, column=0, sticky=W)
+            
+            self.dsttext = Label(self.files, text="")
+            self.dsttext.grid(row=3, column=1, sticky=W)
+            self.dsttext.bind("<Button-1>", lambda e: openFile(self.dsttext["text"]))
+            self.dsttext.bind("<Enter>", partial(changeWhenHovered, self.dsttext, "blue", True))
+            self.dsttext.bind("<Leave>", partial(changeWhenHovered, self.dsttext, "black", False))
+            
             
             self.files.pack(fill = X, padx = 8, pady = (0, 10))
             
@@ -259,9 +269,9 @@ class DataProcessorGUI:
             self.output.columnconfigure(0, weight=1)
             
             # Output - Content
-            self.consoletext = Label(self.output, text="", padx = 0, pady = 3, fg="black", font=("TkDefaultFont", 8))
+            self.consoletext = Label(self.output, text="", padx = 0, pady = 3, fg="gray", font=("TkDefaultFont", 8))
             self.consoletext.grid(row=0, column=0, sticky=W+E) 
-
+            
             self.output.pack(fill = X, pady = (7, 0))   
        
         # Graph
@@ -326,12 +336,13 @@ class DataProcessorGUI:
                 self.showGraph(self.root.filename, self.Processor.getAxographFile()) if (self.Processor.isGraphable()) else self.clearGraph()   
         except Exception as e:
             traceback.print_exc()
-            self.GUIPrint("Error in processing " + self.InputFileName[self.InputFileName.rfind('/')+1:])
+            self.GUIPrint("Error in opening " + self.InputFileName[self.InputFileName.rfind('/')+1:])
             return False
         
         self.export['state'] = NORMAL # allow for the export button to work
         self.export['command'] = self.Export
         self.view['state'] = DISABLED # disable the view button
+        self.GUIPrint("\"" + self.inputtext['text'] + "\" opened for processing.")
         self.prepFields()
     
     def OpenDir(self):
@@ -361,8 +372,9 @@ class DataProcessorGUI:
                     self.export['state'] = NORMAL # allow for the export button to work
                     self.export['command'] = self.ExportDir
                     self.view['state'] = DISABLED # disable the view button
+                    self.GUIPrint("\"" + self.srctext['text'] + "\" opened for processing.")
                     self.prepFields()
-
+                   
                     return True
                     
             self.GUIPrint("No files in /.../" + directory[directory.rfind("/")+1:] + "/ to process.")        
@@ -419,24 +431,29 @@ class DataProcessorGUI:
         dir = filedialog.askdirectory(initialdir = self.OutputDirectory, title = "Select a folder to save all reports into.")
         if (dir != ""): # The user chose a folder
             self.OutputDirectory = dir 
-            self.GUIPrint("Output folder changed: " + self.OutputDirectory)
+            self.GUIPrint("Destination folder set. Right click destination path to change.")
             #messagebox.showinfo("Ouput Folder", "Output folder set! Ready to process.")
-            print("Output folder changed: " + self.OutputDirectory )
-            self.export.bind('<Button-3>', self.OutputFolderChange) 
+            print("Destination folder set: " + self.OutputDirectory)
+            self.dsttext['text'] = self.OutputDirectory
+            self.dsttext.bind('<Button-3>', self.OutputFolderChange) 
+            return True
         else: # The user selected cancel
             print("No output folder chosen.")
-            self.GUIPrint("ERROR: Please choose a folder to store processing reports to complete the processing.")
+            return False
+            
         
     def OutputFolderCheck(self):
         if (self.OutputDirectory == str(self.root)) or (Path(self.OutputDirectory).is_dir() == False):
             self.OutputDirectory = str(self.root)
+            self.dsttext['text'] = ""
             #messagebox.showinfo("Output Folder", "Output folder for reports not yet specified. Please select a folder to save reports into.")
-            self.OutputFolderChoose()
+            if (self.OutputFolderChoose() == False):
+                self.GUIPrint("ERROR: Please choose a destination folder to store the processing reports.")
             return False
         return True;
     
     def OutputFolderChange(self, event):
-        MsgBox = messagebox.askquestion("Output Folder?", "Would you like to change the folder that the reports are being saved into?")
+        MsgBox = messagebox.askquestion("Change Destination Folder", "Would you like to change the destination folder that the reports are being saved into?")
         if (MsgBox == 'no'):
             return False
         else:
@@ -454,7 +471,7 @@ class DataProcessorGUI:
                     
             if (self.OutputFileType == ".txt"):
                 self.OutputToTxt(); 
-                messagebox.showinfo("Processing Complete", "\"" + self.OutputFileName + "\" created in " + "\"" + self.OutputDirectory + "\"" )
+                messagebox.showinfo("Processing Complete!", "\"" + self.OutputFileName + "\" created in " + "\"" + self.OutputDirectory + "\"" )
             elif (self.OutputFileType == ".xlsx"):
                 # Create an excel file
                 self.OutputExcelFile = self.InitXLSX(self.InputFileName[self.InputFileName.rfind('/')+1:] + " Report")
@@ -476,7 +493,7 @@ class DataProcessorGUI:
                 self.OutputExcelFile.close() 
                 print(self.OutputFileName + " created in output folder.")
                 self.GUIPrint(self.OutputFileName + " created in output folder.")
-                messagebox.showinfo("Processing Complete", "\"" + self.OutputFileName + "\" created in " + "\"" + self.OutputDirectory + "\"" )
+                messagebox.showinfo("Processing Complete!", "\"" + self.OutputFileName + "\" created in " + "\"" + self.OutputDirectory + "\"" )
             self.view['command'] = self.ViewFile
             self.view['state'] = NORMAL
 
@@ -546,7 +563,7 @@ class DataProcessorGUI:
         if self.OutputFileType == ".xlsx":  
             # Close the excel file          
             self.OutputExcelFile.close()
-            messagebox.showinfo("Processing Complete", "All files processed. " + "\"" + self.OutputFileName + "\" created in " + "\"" + self.OutputDirectory +"\"")         
+            messagebox.showinfo("Processing Complete!", "All files processed. " + "\"" + self.OutputFileName + "\" created in " + "\"" + self.OutputDirectory +"\"")         
     
     def ViewDir(self):
         if os.path.isdir(self.OutputDirectory):
