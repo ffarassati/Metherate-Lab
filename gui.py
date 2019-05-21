@@ -428,7 +428,7 @@ class DataProcessorGUI:
         if (dir != ""): # The user chose a folder
             self.OutputDirectory = dir 
             self.GUIPrint("Output folder changed: " + self.OutputDirectory)
-            messagebox.showinfo("Ouput Folder", "Output folder set! Ready to process.")
+            #messagebox.showinfo("Ouput Folder", "Output folder set! Ready to process.")
             print("Output folder changed: " + self.OutputDirectory )
             self.export.bind('<Button-3>', self.OutputFolderChange) 
         else: # The user selected cancel
@@ -501,7 +501,7 @@ class DataProcessorGUI:
             # if (MsgBox == 'no'):
                 # return False
                 
-            threading.Thread(target=self.ExportDirThread).start() 
+            threading.Thread(target=self.ExportDirThread).start()   
         else:
             self.GUIPrint("ERROR: Slider values are not logical.")
     
@@ -548,14 +548,13 @@ class DataProcessorGUI:
                     outputtitle = self.OutputFileName
                     self.view['command'] = self.ViewFile
                 self.view['state'] = NORMAL
-                
+        self.GUIPrint("All files processed into " + outputtitle)  
+        print("All files processed into " + outputtitle)  
+        self.root['cursor'] = ""  
         if self.OutputFileType == ".xlsx":  
             # Close the excel file          
             self.OutputExcelFile.close()
-            messagebox.showinfo("Processing Complete", "All files processed. " + "\"" + self.OutputFileName + "\" created in " + "\"" + self.OutputDirectory +"\"")        
-        self.GUIPrint("All files processed into " + outputtitle)  
-        print("All files processed into " + outputtitle)  
-        self.root['cursor'] = ""    
+            messagebox.showinfo("Processing Complete", "All files processed. " + "\"" + self.OutputFileName + "\" created in " + "\"" + self.OutputDirectory +"\"")         
     
     def ViewDir(self):
         if os.path.isdir(self.OutputDirectory):
