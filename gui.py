@@ -9,6 +9,7 @@ from tkinter import *
 from tkinter import filedialog
 from tkinter import messagebox
 import tkinter.ttk as ttk
+from tkinter.font import Font
 import xlsxwriter
 from functools import partial
 #import matplotlib
@@ -19,8 +20,6 @@ from functools import partial
 #matplotlib.use("TkAgg")
 from processor import DataProcessor
 import threading
-import configparser
-
 
 # GLOBAL: SLASH
 SLASH = "/"
@@ -37,12 +36,9 @@ PERCENTAGE2 = .3333333
 STD = 3
 INITIALPLUS = 5
 MAXPLUS = 25
-
 STARTINGDIRECTORY = ""
 OUPTUTDIRECTORY = ""
 GRAPH = False
-
-
 
 # Static Functions
 def changeState(TextEntry):
@@ -52,10 +48,18 @@ def getFileExt(path):
     # Returns the file extension (i.e. '.atf') from any file path string
     return(path[path.rfind('.'):])
 
-def changeWhenHovered(widget, color, event):
+def changeWhenHovered(widget, color, underlineBool, event):
     if (widget['text'] != "(Entire Directory)"):
-        widget["fg"] = color
+        #widget["fg"] = color
         widget["cursor"] = "hand2"
+        #print(widget["font"])
+        f = Font(widget, widget["font"])
+        f.configure(underline = underlineBool)
+        #widget.configure(font=("TkDefaultFont", "underline"))
+        widget.configure(font=f)
+
+
+        #font = tkFont.Font(widget, widget["font"])
 
 def openFile(filename):
     if sys.platform == "win32":
@@ -139,8 +143,8 @@ class DataProcessorGUI:
             
             self.inputtext = Label(self.files, text="")
             self.inputtext.grid(row=1, column=1, sticky=W)
-            self.inputtext.bind("<Enter>", partial(changeWhenHovered, self.inputtext, "blue"))
-            self.inputtext.bind("<Leave>", partial(changeWhenHovered, self.inputtext, "black"))
+            self.inputtext.bind("<Enter>", partial(changeWhenHovered, self.inputtext, "blue", True))
+            self.inputtext.bind("<Leave>", partial(changeWhenHovered, self.inputtext, "black", False))
             
             self.FolderName = Label(self.files, text="Folder: ", padx = 2, pady = 3)
             self.FolderName.grid(row=2, column=0, sticky=W)
@@ -148,8 +152,8 @@ class DataProcessorGUI:
             self.srctext = Label(self.files, text="")
             self.srctext.grid(row=2, column=1, sticky=W)
             self.srctext.bind("<Button-1>", lambda e: openFile(self.srctext["text"]))
-            self.srctext.bind("<Enter>", partial(changeWhenHovered, self.srctext, "blue"))
-            self.srctext.bind("<Leave>", partial(changeWhenHovered, self.srctext, "black"))
+            self.srctext.bind("<Enter>", partial(changeWhenHovered, self.srctext, "blue", True))
+            self.srctext.bind("<Leave>", partial(changeWhenHovered, self.srctext, "black", False))
             
             self.files.pack(fill = X, padx = 8, pady = (0, 10))
             
@@ -268,18 +272,6 @@ class DataProcessorGUI:
         
         mainloop()
     
-    # def readConf(self):
-        # if not os.path.isfile("config.ini"):
-            # config = configparser.ConfigParser()
-            # config['Inputs'] = {'percentage1': '.3', 'percentage2': '.3333333', 'std': '3', 'initialplus': '5', 'maxplus' : '25'}
-            # config['Directories'] = {'startingdirectory' : '.', 'outputdirectory' : '.'}
-            # configfile = open('example.ini', 'w')
-            # config.write(configfile)
-            # configfile.close()
-    
-    # def writeConf(self):
-        # pass
-    
     def GUIPrint(self, string):
         self.consoletext['text'] = string
         
@@ -314,7 +306,7 @@ class DataProcessorGUI:
         if (self.DefaultDirectory == self.root) or (Path(self.DefaultDirectory).is_dir() == False):
             self.DefaultDirectory = self.root
             
-        self.root.filename = filedialog.askopenfilename(initialdir = self.DefaultDirectory, title = "Choose single file to process", filetypes = (("AXGR Files","*.axgr"), ("ATF Files","*.atf"))) # Pop-up window to choose a file to process  
+        self.root.filename = filedialog.askopenfilename(initialdir = self.DefaultDirectory, title = "Select a single .AXGR or .ATF file to process.", filetypes = (("AXGR Files","*.axgr"), ("ATF Files","*.atf"))) # Pop-up window to choose a file to process  
         if (getFileExt(self.root.filename) != ".axgr") and (getFileExt(self.root.filename) != ".atf"):
             return False # end the function if they pressed cancel
 
@@ -347,7 +339,7 @@ class DataProcessorGUI:
         if (self.DefaultDirectory == self.root) or (Path(self.DefaultDirectory).is_dir() == False):
             self.DefaultDirectory = self.root
 
-        directory = filedialog.askdirectory(initialdir = self.DefaultDirectory, title = "Choose folder from which to process")
+        directory = filedialog.askdirectory(initialdir = self.DefaultDirectory, title = "Select a folder from which to process all .AXGR or .ATF files.")
 
         try:
             for i in sorted(os.listdir(directory)):
@@ -424,7 +416,7 @@ class DataProcessorGUI:
         return False  
 
     def OutputFolderChoose(self):
-        dir = filedialog.askdirectory(initialdir = self.OutputDirectory, title = "Choose folder to store reports in")
+        dir = filedialog.askdirectory(initialdir = self.OutputDirectory, title = "Select a folder to save all reports into.")
         if (dir != ""): # The user chose a folder
             self.OutputDirectory = dir 
             self.GUIPrint("Output folder changed: " + self.OutputDirectory)
@@ -438,7 +430,7 @@ class DataProcessorGUI:
     def OutputFolderCheck(self):
         if (self.OutputDirectory == str(self.root)) or (Path(self.OutputDirectory).is_dir() == False):
             self.OutputDirectory = str(self.root)
-            messagebox.showinfo("Output Folder", "Output folder for reports not yet specified. Please select a folder to save reports into.")
+            #messagebox.showinfo("Output Folder", "Output folder for reports not yet specified. Please select a folder to save reports into.")
             self.OutputFolderChoose()
             return False
         return True;
