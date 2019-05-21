@@ -63,7 +63,7 @@ def openFile(filename):
 
 class DataProcessorGUI:    
 
-    def __init__(self, name="Data Processor (version 4)"):
+    def __init__(self, name="Data Processor (gui mode)"):
     
         # GUI - Root 
         self.root = Tk()
