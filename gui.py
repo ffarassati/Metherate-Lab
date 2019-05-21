@@ -19,6 +19,7 @@ from functools import partial
 #matplotlib.use("TkAgg")
 from processor import DataProcessor
 import threading
+import configparser
 
 
 # GLOBAL: SLASH
@@ -30,14 +31,16 @@ elif (sys.platform == 'darwin'):
     print(__file__, "running on Mac.")
     SLASH = "/";
 
-# CONFIG FILE?
-GRAPH = False
+# CONFIG FILE
 PERCENTAGE1 = .3
 PERCENTAGE2 = .3333333
 STD = 3
 INITIALPLUS = 5
 MAXPLUS = 25
+
 STARTINGDIRECTORY = ""
+OUPTUTDIRECTORY = ""
+GRAPH = False
 
 
 
@@ -59,12 +62,12 @@ def openFile(filename):
         os.startfile(filename)
     else:
         opener ="open" if sys.platform == "darwin" else "xdg-open"
-        subprocess.call([opener, filename])
+        subprocess.call([opener, filename])    
 
 class DataProcessorGUI:    
 
     def __init__(self, name="Data Processor (gui mode)"):
-    
+       
         # GUI - Root 
         self.root = Tk()
         self.root.wm_title(name)
@@ -265,6 +268,18 @@ class DataProcessorGUI:
         
         mainloop()
     
+    # def readConf(self):
+        # if not os.path.isfile("config.ini"):
+            # config = configparser.ConfigParser()
+            # config['Inputs'] = {'percentage1': '.3', 'percentage2': '.3333333', 'std': '3', 'initialplus': '5', 'maxplus' : '25'}
+            # config['Directories'] = {'startingdirectory' : '.', 'outputdirectory' : '.'}
+            # configfile = open('example.ini', 'w')
+            # config.write(configfile)
+            # configfile.close()
+    
+    # def writeConf(self):
+        # pass
+    
     def GUIPrint(self, string):
         self.consoletext['text'] = string
         
@@ -439,6 +454,7 @@ class DataProcessorGUI:
         if self.ValidateInputs():
             if not self.OutputFolderCheck():
                 return None;
+                
             self.Processor.Process(self.BaselineStart, self.BaselineEnd, self.OnsetStart, self.OnsetEnd, self.DeviationMultiplier, self.PlusInitialPeak, self.PlusMaxPeak, self.PlusMaxSlope, self.RegressionPoints)
             
             if GRAPH == True:
@@ -446,6 +462,7 @@ class DataProcessorGUI:
                     
             if (self.OutputFileType == ".txt"):
                 self.OutputToTxt(); 
+                messagebox.showinfo("Processing Complete", "\"" + self.OutputFileName + "\" created in " + "\"" + self.OutputDirectory + "\"" )
             elif (self.OutputFileType == ".xlsx"):
                 # Create an excel file
                 self.OutputExcelFile = self.InitXLSX(self.InputFileName[self.InputFileName.rfind('/')+1:] + " Report")
@@ -465,8 +482,9 @@ class DataProcessorGUI:
                 self.OutputToXLSX(MaxSlopeSheet, self.Processor.getMaxSlope())
                 # Close the excel file  
                 self.OutputExcelFile.close() 
-                print(self.OutputFileName + " created in source folder subdirectory.")
-                self.GUIPrint(self.OutputFileName + " created in source folder subdirectory.")
+                print(self.OutputFileName + " created in output folder.")
+                self.GUIPrint(self.OutputFileName + " created in output folder.")
+                messagebox.showinfo("Processing Complete", "\"" + self.OutputFileName + "\" created in " + "\"" + self.OutputDirectory + "\"" )
             self.view['command'] = self.ViewFile
             self.view['state'] = NORMAL
 
@@ -477,12 +495,13 @@ class DataProcessorGUI:
         if self.ValidateInputs():
             if not self.OutputFolderCheck():
                 return None;
-            message = "Process all .AXGR and .ATF files in " + self.DefaultDirectory + " with the variables inputted? This will overwrite any prexisting reports of those files in the output folder."
-            MsgBox = messagebox.askquestion("Process all files?", message)
-            if (MsgBox == 'no'):
-                return False
-            else:
-                threading.Thread(target=self.ExportDirThread).start() 
+                
+            # message = "Process all .AXGR and .ATF files in " + self.DefaultDirectory + " with the variables inputted? This will overwrite any prexisting reports of those files in the output folder."
+            # MsgBox = messagebox.askquestion("Process all files?", message)
+            # if (MsgBox == 'no'):
+                # return False
+                
+            threading.Thread(target=self.ExportDirThread).start() 
         else:
             self.GUIPrint("ERROR: Slider values are not logical.")
     
@@ -532,7 +551,8 @@ class DataProcessorGUI:
                 
         if self.OutputFileType == ".xlsx":  
             # Close the excel file          
-            self.OutputExcelFile.close()   
+            self.OutputExcelFile.close()
+            messagebox.showinfo("Processing Complete", "All files processed. " + "\"" + self.OutputFileName + "\" created in " + "\"" + self.OutputDirectory +"\"")        
         self.GUIPrint("All files processed into " + outputtitle)  
         print("All files processed into " + outputtitle)  
         self.root['cursor'] = ""    
