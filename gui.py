@@ -412,23 +412,24 @@ class DataProcessorGUI:
         dir = filedialog.askdirectory(initialdir = self.OutputDirectory, title = "Choose folder to store reports in")
         if (dir != ""): # The user chose a folder
             self.OutputDirectory = dir 
-            self.GUIPrint("Output folder changed: " + self.OutputDirectory )
+            self.GUIPrint("Output folder changed: " + self.OutputDirectory)
+            messagebox.showinfo("Ouput Folder", "Output folder set! Ready to process.")
             print("Output folder changed: " + self.OutputDirectory )
             self.export.bind('<Button-3>', self.OutputFolderChange) 
-            return True;
         else: # The user selected cancel
             print("No output folder chosen.")
             self.GUIPrint("ERROR: Please choose a folder to store processing reports to complete the processing.")
-            return False
         
     def OutputFolderCheck(self):
         if (self.OutputDirectory == str(self.root)) or (Path(self.OutputDirectory).is_dir() == False):
             self.OutputDirectory = str(self.root)
-            return self.OutputFolderChoose()
+            messagebox.showinfo("Output Folder", "Output folder for reports not yet specified. Please select a folder to save reports into.")
+            self.OutputFolderChoose()
+            return False
         return True;
     
     def OutputFolderChange(self, event):
-        MsgBox = messagebox.askquestion("Change output folder?", "Would you like to change the folder to which the reports are being saved?")
+        MsgBox = messagebox.askquestion("Output Folder?", "Would you like to change the folder that the reports are being saved into?")
         if (MsgBox == 'no'):
             return False
         else:
