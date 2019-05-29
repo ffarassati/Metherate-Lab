@@ -471,7 +471,12 @@ class DataProcessorGUI:
                     
             if (self.OutputFileType == ".txt"):
                 self.OutputToTxt(); 
+                
+                print(self.OutputFileName + " created in output folder.")
+                self.GUIPrint(self.OutputFileName + " created in output folder.")
+                #self.GUIPrint("")   
                 messagebox.showinfo("Processing Complete!", "\"" + self.OutputFileName + "\" created in " + "\"" + self.OutputDirectory + "\"" )
+            
             elif (self.OutputFileType == ".xlsx"):
                 # Create an excel file
                 self.OutputExcelFile = self.InitXLSX(self.InputFileName[self.InputFileName.rfind('/')+1:] + " Report")
@@ -491,8 +496,10 @@ class DataProcessorGUI:
                 self.OutputToXLSX(MaxSlopeSheet, self.Processor.getMaxSlope())
                 # Close the excel file  
                 self.OutputExcelFile.close() 
+                
                 print(self.OutputFileName + " created in output folder.")
                 self.GUIPrint(self.OutputFileName + " created in output folder.")
+                #self.GUIPrint("")   
                 messagebox.showinfo("Processing Complete!", "\"" + self.OutputFileName + "\" created in " + "\"" + self.OutputDirectory + "\"" )
             self.view['command'] = self.ViewFile
             self.view['state'] = NORMAL
@@ -540,7 +547,7 @@ class DataProcessorGUI:
                     self.showGraph(self.InputFileName, self.Processor.getAxographFile()) if (self.Processor.isGraphable()) else self.clearGraph()   
                     
                 if (self.OutputFileType == ".txt"):
-                    self.OutputToTxt();                                   
+                    self.OutputToTxt();        s                           
                     self.view['command'] = self.ViewDir
                     outputtitle = "source folder subdirectory."
                 elif (self.OutputFileType == ".xlsx"):
@@ -557,7 +564,8 @@ class DataProcessorGUI:
                     outputtitle = self.OutputFileName
                     self.view['command'] = self.ViewFile
                 self.view['state'] = NORMAL
-        self.GUIPrint("All files processed into " + outputtitle)  
+        self.GUIPrint("All files processed into " + outputtitle) 
+        #self.GUIPrint("")   
         print("All files processed into " + outputtitle)  
         self.root['cursor'] = ""  
         if self.OutputFileType == ".xlsx":  
@@ -638,9 +646,7 @@ class DataProcessorGUI:
         self.OutputToTxtWrite(outputfile, ("Initial Max Slope (+ " + str(self.PlusMaxSlope) + " ms)"), self.Processor.getMaxSlope())
         
         outputfile.close() #print(oname[oname.rfind("\\")+1:] + " created.")
-        
-        print(self.OutputFileName + " created in output folder.")
-        self.GUIPrint(self.OutputFileName + " created in output folder.")
+       
         
     def OutputToTxtWrite(self, outputfile, title, OutputDict):
         outputfile.write(title+":\n")
