@@ -43,23 +43,29 @@ class DataProcessor:
                     elif (line.find("\t") == -1): # The last channel in the row
                         self.Channels[channel].append(float(line.strip()))
         self.NumberOfLines = len(self.Time)
+        return True;
 
     def extractAXGR(self, file_name):
-        inputfile = axographio.read(file_name)
-        for row in inputfile.data[0]: # Time column
-            self.Time.append(float(row))       
-        self.NumberOfChannels = len(inputfile.data[1:])
-        self.Channels = {x+1:[] for x in range(self.NumberOfChannels)} #literally 1-14
-        for x in range(14): # channel columns [1:14]
-            for datavalue in inputfile.data[x+1]:  
-                self.Channels[x+1].append(float(datavalue))
-        self.NumberOfLines = len(self.Time)
-        self.AxographFile = inputfile
-
+        try:
+            inputfile = axographio.read(file_name)
+        except:
+            return False
+        else:
+            for row in inputfile.data[0]: # Time column
+                self.Time.append(float(row))       
+            self.NumberOfChannels = len(inputfile.data[1:])
+            self.Channels = {x+1:[] for x in range(self.NumberOfChannels)} #literally 1-14
+            for x in range(14): # channel columns [1:14]
+                for datavalue in inputfile.data[x+1]:  
+                    self.Channels[x+1].append(float(datavalue))
+            self.NumberOfLines = len(self.Time)
+            self.AxographFile = inputfile
+            return True
+        
     def msToTimeIndex(self, ms):
         for index in range(len(self.Time)):
             if (not ms > self.Time[index]):
-                return (index - 1)
+                return (index)
 
     def peak(self, channel, searchStart, searchEnd):
         maxvalue = 0.0
@@ -83,54 +89,56 @@ class DataProcessor:
 
     def stddeviation(self, channel, searchStart, searchEnd):
         datapoints = []
-        for index in (range(self.msToTimeIndex(searchStart), self.msToTimeIndex(searchEnd))):
+        #print("VALUES FOR STD", self.msToTimeIndex(searchStart), self.msToTimeIndex(searchEnd))
+        for index in (range(self.msToTimeIndex(searchStart), self.msToTimeIndex(searchEnd) + 1)):
+            #print("INDEX", index)
             datapoints.append(self.Channels[channel][index])
+        #print(datapoints)    
         return statistics.stdev(datapoints)
 
-    def onsetHelper(self, channel, possible_onsets, total, portion):
+    def onsetHelper(self, channel, index, total, portion):
         onset = "(?)"
         
         #print("Checking for", portion, "/", total, ":")
-        for index in possible_onsets:
-            asc_counter = 0
-            for plus in range(total):
-                if self.Channels[channel][index + plus] >= self.Channels[channel][index + plus - 1]:
-                    asc_counter += 1
-            
-            desc_counter = 0
-            for plus in range(total):
-                if self.Channels[channel][index + plus] <= self.Channels[channel][index + plus - 1]:
-                    desc_counter += 1              
-            
-            if (asc_counter >= portion):
-                #print("found a good ascending:", self.Time[index])
-                onset = self.Time[index]   
-                break    
-            elif (desc_counter >= portion):
-                #print("found a good descending:", self.Time[index])
-                onset = self.Time[index]   
-                break
-            #else:
-                #print(self.Time[index], "only got ", (asc_counter if asc_counter > desc_counter else desc_counter))
-                    
+        asc_counter = 0
+        for plus in range(total):
+            if self.Channels[channel][index + plus] >= self.Channels[channel][index + plus - 1]:
+                asc_counter += 1
+        
+        desc_counter = 0
+        for plus in range(total):
+            if self.Channels[channel][index + plus] <= self.Channels[channel][index + plus - 1]:
+                desc_counter += 1              
+        
+        if (asc_counter >= portion):
+            #print("found a good ascending:", self.Time[index])
+            onset = self.Time[index]    
+        elif (desc_counter >= portion):
+            #print("found a good descending:", self.Time[index])
+            onset = self.Time[index]   
+        #else:
+            #print(self.Time[index], "only got ", (asc_counter if asc_counter > desc_counter else desc_counter))
+                
         return onset
     
     def onset(self, channel, StandardDeviation):
         OnsetPoint = self.DeviationMultiplier * StandardDeviation
-        
+        #print(channel, ": Standard Deviation*3 is ", OnsetPoint)
         possible_onsets = []
+        onset = "(?)"
 
         #print("Checking channel", channel)
         for index in (range(self.msToTimeIndex(self.OnsetStart), self.msToTimeIndex(self.OnsetEnd))):
             if (self.Channels[channel][index] >= OnsetPoint and self.Channels[channel][index+1] <= OnsetPoint) or (self.Channels[channel][index] <= OnsetPoint and self.Channels[channel][index+1] >= OnsetPoint) or (self.Channels[channel][index] >= (-1*OnsetPoint) and self.Channels[channel][index+1] <= (-1*OnsetPoint)) or (self.Channels[channel][index] <= (-1*OnsetPoint) and self.Channels[channel][index+1] >= (-1*OnsetPoint)):
-                #possible_onsets.insert(0,index)
+                possible_onsets.insert(0,index)
                 possible_onsets.append(index)
                 #print(self.Time[index],":", OnsetPoint, "is between", self.Channels[channel][index], "and", self.Channels[channel][index+1])
         
-        for number in range(3):
-            onset = self.onsetHelper(channel, possible_onsets, 30, (25 - (4*number)))
-            if onset != "(?)":
-                break
+        for index in possible_onsets:
+            for number in range(50):
+                onset = self.onsetHelper(channel, index, 100, (70 - (number)))
+                if onset != "(?)":
+                    break
                   
         #print(onset,"determined as the onset") 
         #print("CHANNEL", channel,"WINNER:", onset)   
@@ -216,9 +224,9 @@ class DataProcessor:
         
     def Extract(self, filename):
         if (getFileExt(filename) == ".atf"):
-            self.extractATF(filename)
+            return self.extractATF(filename)
         elif (getFileExt(filename) == ".axgr"):
-            self.extractAXGR(filename) 
+            return self.extractAXGR(filename) 
         
     def getAxographFile(self):
         return self.AxographFile;

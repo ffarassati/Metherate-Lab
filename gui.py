@@ -10,6 +10,7 @@ from tkinter import filedialog
 from tkinter import messagebox
 import tkinter.ttk as ttk
 from tkinter.font import Font
+from tkinter import simpledialog
 import xlsxwriter
 from functools import partial
 #import matplotlib
@@ -69,7 +70,7 @@ def openFile(filename):
         subprocess.call([opener, filename])    
 
 class DataProcessorGUI:    
-
+    
     def __init__(self, name="Data Processor (gui mode)"):
        
         # GUI - Root 
@@ -112,12 +113,13 @@ class DataProcessorGUI:
             exporttext = Label(self.taskbar, text="Export as:")
             exporttext.grid(row=0, column=3, sticky=E)
             
-            self.ComboBox = ttk.Combobox(self.taskbar, values=(".txt", ".xlsx"), width = 4) # .xlsx support coming soon
+            self.ComboBox = ttk.Combobox(self.taskbar,  width = 4) # .xlsx support coming soon, values=(".txt", ".xlsx"),
             self.ComboBox.set(self.OutputFileType)
+            self.updateFileTypeBox(True);
             self.ComboBox.grid(row=0, column=4, sticky=W+E)
             self.ComboBox.bind('<<ComboboxSelected>>', self.SelectOutputType)
 
-            self.export = Button(master=self.taskbar, text="Process and Export")
+            self.export = Button(master=self.taskbar, text="Choose Output Folder")
             self.export.grid(row=0, column=5, sticky=W+E, padx=3)
             self.export['state'] = DISABLED
 
@@ -319,7 +321,8 @@ class DataProcessorGUI:
         self.root.filename = filedialog.askopenfilename(initialdir = self.DefaultDirectory, title = "Select a single .AXGR or .ATF file to process.", filetypes = (("AXGR Files","*.axgr"), ("ATF Files","*.atf"))) # Pop-up window to choose a file to process  
         if (getFileExt(self.root.filename) != ".axgr") and (getFileExt(self.root.filename) != ".atf"):
             return False # end the function if they pressed cancel
-
+        
+        self.updateFileTypeBox(True);
 
         self.DefaultDirectory = self.root.filename[:self.root.filename.rfind("/")] # Remember this file directory
         self.InputFileName = self.root.filename
@@ -354,7 +357,7 @@ class DataProcessorGUI:
 
         try:
             for i in sorted(os.listdir(directory)):
-                if (not os.path.isdir(directory + SLASH + i)) and (getFileExt(i) == ".atf" or getFileExt(i) == ".axgr"):                  
+                if (not os.path.isdir(directory + SLASH + i)) and (getFileExt(i) == ".atf" or getFileExt(i) == ".axgr"):
                     self.DefaultDirectory = directory
                     self.InputFileName = (self.DefaultDirectory + '/' + i)
 
@@ -363,19 +366,19 @@ class DataProcessorGUI:
                     self.inputtext["cursor"] = ""
                     
                     self.Processor = DataProcessor()
-                    self.Processor.Extract(self.InputFileName)
-                    
-                    self.srctext['text'] = self.DefaultDirectory
-                    
-                    self.GUIPrint("") # clear console
-                    
-                    self.export['state'] = NORMAL # allow for the export button to work
-                    self.export['command'] = self.ExportDir
-                    self.view['state'] = DISABLED # disable the view button
-                    self.GUIPrint("\"" + self.srctext['text'] + "\" opened for processing.")
-                    self.prepFields()
-                   
-                    return True
+                    if (self.Processor.Extract(self.InputFileName) == True):
+                        self.srctext['text'] = self.DefaultDirectory
+                        
+                        self.GUIPrint("") # clear console
+                        
+                        self.export['state'] = NORMAL # allow for the export button to work
+                        self.export['command'] = self.ExportDir
+                        self.view['state'] = DISABLED # disable the view button
+                        self.GUIPrint("\"" + self.srctext['text'] + "\" opened for processing.")
+                        self.prepFields()
+                        print("Found an .axgr file in the directory.");
+                        self.updateFileTypeBox(False);
+                        return True
                     
             self.GUIPrint("No files in /.../" + directory[directory.rfind("/")+1:] + "/ to process.")        
             return False
@@ -435,6 +438,7 @@ class DataProcessorGUI:
             #messagebox.showinfo("Ouput Folder", "Output folder set! Ready to process.")
             print("Destination folder set: " + self.OutputDirectory)
             self.dsttext['text'] = self.OutputDirectory
+            self.export['text'] = "Process and Export"
             self.dsttext.bind('<Button-3>', self.OutputFolderChange) 
             return True
         else: # The user selected cancel
@@ -446,6 +450,8 @@ class DataProcessorGUI:
         if (self.OutputDirectory == str(self.root)) or (Path(self.OutputDirectory).is_dir() == False):
             self.OutputDirectory = str(self.root)
             self.dsttext['text'] = ""
+            self.export['text'] = "Choose Output Folder"
+            
             #messagebox.showinfo("Output Folder", "Output folder for reports not yet specified. Please select a folder to save reports into.")
             if (self.OutputFolderChoose() == False):
                 self.GUIPrint("ERROR: Please choose a destination folder to store the processing reports.")
@@ -479,7 +485,7 @@ class DataProcessorGUI:
             
             elif (self.OutputFileType == ".xlsx"):
                 # Create an excel file
-                self.OutputExcelFile = self.InitXLSX(self.InputFileName[self.InputFileName.rfind('/')+1:] + " Report")
+                self.OutputExcelFile = self.InitXLSX(self.InputFileName[self.InputFileName.rfind('/')+1:self.InputFileName.find(".")])
                 if (self.OutputExcelFile == None):
                     return False
                 # Create sheets in the excel file
@@ -516,6 +522,11 @@ class DataProcessorGUI:
             # MsgBox = messagebox.askquestion("Process all files?", message)
             # if (MsgBox == 'no'):
                 # return False
+            
+            # Create an excel file
+            self.OutputExcelFile = self.InitXLSX(self.DefaultDirectory[self.DefaultDirectory.rfind("/")+1:])
+            if (self.OutputExcelFile == None):  
+                return False    
                 
             threading.Thread(target=self.ExportDirThread).start()   
         else:
@@ -523,10 +534,6 @@ class DataProcessorGUI:
     
     def ExportDirThread(self):
         if self.OutputFileType == ".xlsx":
-            # Create an excel file
-            self.OutputExcelFile = self.InitXLSX(self.DefaultDirectory[self.DefaultDirectory.rfind("/")+1:] + " Report")
-            if (self.OutputExcelFile == None):  
-                return False
             # Create sheets in the excel file    
             OnsetSheet = self.CreateXLSXSheet("Response Onset Latency")
             InitialPeakSheet = self.CreateXLSXSheet("Initial Peak Amplitude")
@@ -540,30 +547,30 @@ class DataProcessorGUI:
             if (not os.path.isdir(self.DefaultDirectory + SLASH + possible_file)) and (getFileExt(possible_file) == ".atf" or getFileExt(possible_file) == ".axgr"): 
                 self.InputFileName = (self.DefaultDirectory + '/' + possible_file)
                 self.Processor = DataProcessor()
-                self.Processor.Extract(self.InputFileName)
-                self.Processor.Process(self.BaselineStart, self.BaselineEnd, self.OnsetStart, self.OnsetEnd, self.DeviationMultiplier, self.PlusInitialPeak, self.PlusMaxPeak, self.PlusMaxSlope, self.RegressionPoints)
-                     
-                if GRAPH == True:
-                    self.showGraph(self.InputFileName, self.Processor.getAxographFile()) if (self.Processor.isGraphable()) else self.clearGraph()   
-                    
-                if (self.OutputFileType == ".txt"):
-                    self.OutputToTxt();        s                           
-                    self.view['command'] = self.ViewDir
-                    outputtitle = "source folder subdirectory."
-                elif (self.OutputFileType == ".xlsx"):
-                    column_counter += 1
-                    print("Processing " + self.InputFileName[self.InputFileName.rfind('/')+1:self.InputFileName.find(".")])
-                    self.GUIPrint("Processing " + self.InputFileName[self.InputFileName.rfind('/')+1:self.InputFileName.find(".")])
-                    # Call a self.function() appending the contents of the current self.Processor to the end of the excel file   
-                    self.OutputToXLSX(OnsetSheet, self.Processor.getOnsetLatency(), column_counter)
-                    self.OutputToXLSX(InitialPeakSheet, self.Processor.getInitialPeak(), column_counter)
-                    self.OutputToXLSX(MaxPeakSheet, self.Processor.getMaxPeak(), column_counter)
-                    self.OutputToXLSX(MaxPeakLSheet, self.Processor.getMaxLPeak(), column_counter)
-                    self.OutputToXLSX(MaxSlopeSheet, self.Processor.getMaxSlope(), column_counter)
-                    
-                    outputtitle = self.OutputFileName
-                    self.view['command'] = self.ViewFile
-                self.view['state'] = NORMAL
+                if (self.Processor.Extract(self.InputFileName) == True):
+                    self.Processor.Process(self.BaselineStart, self.BaselineEnd, self.OnsetStart, self.OnsetEnd, self.DeviationMultiplier, self.PlusInitialPeak, self.PlusMaxPeak, self.PlusMaxSlope, self.RegressionPoints)
+                         
+                    if GRAPH == True:
+                        self.showGraph(self.InputFileName, self.Processor.getAxographFile()) if (self.Processor.isGraphable()) else self.clearGraph()   
+                        
+                    if (self.OutputFileType == ".txt"):
+                        self.OutputToTxt();        s                           
+                        self.view['command'] = self.ViewDir
+                        outputtitle = "source folder subdirectory."
+                    elif (self.OutputFileType == ".xlsx"):
+                        column_counter += 1
+                        print("Processing " + self.InputFileName[self.InputFileName.rfind('/')+1:self.InputFileName.find(".")])
+                        self.GUIPrint("Processing " + self.InputFileName[self.InputFileName.rfind('/')+1:self.InputFileName.find(".")])
+                        # Call a self.function() appending the contents of the current self.Processor to the end of the excel file   
+                        self.OutputToXLSX(OnsetSheet, self.Processor.getOnsetLatency(), column_counter)
+                        self.OutputToXLSX(InitialPeakSheet, self.Processor.getInitialPeak(), column_counter)
+                        self.OutputToXLSX(MaxPeakSheet, self.Processor.getMaxPeak(), column_counter)
+                        self.OutputToXLSX(MaxPeakLSheet, self.Processor.getMaxLPeak(), column_counter)
+                        self.OutputToXLSX(MaxSlopeSheet, self.Processor.getMaxSlope(), column_counter)
+                        
+                        outputtitle = self.OutputFileName
+                        self.view['command'] = self.ViewFile
+                    self.view['state'] = NORMAL
         self.GUIPrint("All files processed into " + outputtitle) 
         #self.GUIPrint("")   
         print("All files processed into " + outputtitle)  
@@ -588,18 +595,27 @@ class DataProcessorGUI:
     def InitXLSX(self, name):
         try:                
             # Make output file name     
-            self.OutputFileName = name + ".xlsx"
-            oname = self.OutputDirectory + SLASH + self.OutputFileName
+            temporaryOutputFileName = simpledialog.askstring("Choose Output Filename", "Please enter a name for the output file.", initialvalue=(name + " Report"), minvalue = " ")
+            if (temporaryOutputFileName == None):
+                return;
+                
+                
+            self.OutputFileName = temporaryOutputFileName
+
+            oname = self.OutputDirectory + SLASH + temporaryOutputFileName + ".xlsx"
             
             # Open and initialize file
             counter = 1
             while True:
                 if os.path.isfile(oname):
                     counter += 1
-                    self.OutputFileName = name + " (" + str(counter) + ").xlsx"
-                    oname = self.OutputDirectory + SLASH + self.OutputFileName
+                    self.OutputFileName = temporaryOutputFileName + " (" + str(counter) + ")"
+                    oname = self.OutputDirectory + SLASH + self.OutputFileName  + ".xlsx"
                 else:
                     break
+            
+            self.OutputFileName += ".xlsx"
+            print("Exporting XLSX to " + self.OutputFileName)
             
             return xlsxwriter.Workbook(oname)  
         except PermissionError as e:
@@ -631,7 +647,12 @@ class DataProcessorGUI:
         
     def OutputToTxt(self):
         # Make output file name
-        self.OutputFileName = self.InputFileName[self.InputFileName.rfind('/')+1:self.InputFileName.find(".")] + " Report.txt"  
+        #self.OutputFileName = self.InputFileName[self.InputFileName.rfind('/')+1:self.InputFileName.find(".")] + " Report.txt"  
+        temporaryOutputFileName = simpledialog.askstring("Choose Output Filename", "Please enter a name for the output file.", initialvalue=(self.InputFileName[self.InputFileName.rfind('/')+1:self.InputFileName.find(".")] + " Report"), minvalue = " ")
+        if (temporaryOutputFileName == None):
+            return;
+        self.OutputFileName = temporaryOutputFileName + ".txt"
+        
         oname = self.OutputDirectory + SLASH + self.OutputFileName
    
         # Open and initialize file
@@ -781,6 +802,13 @@ class DataProcessorGUI:
                
     def SelectOutputType(self, event):
         self.OutputFileType = self.ComboBox.get()
+        
+    def updateFileTypeBox(self, add):
+        if (add == True): # Add
+            self.ComboBox['values'] = (".txt", ".xlsx")
+        elif (add == False):
+            self.ComboBox['values'] = (".xlsx")
+            self.ComboBox.set(".xlsx")
 
 if __name__ == "__main__":       
     GUI = DataProcessorGUI()
