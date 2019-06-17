@@ -1,0 +1,15 @@
+#!/bin/bash
+
+echo Beginning install process for DataProcessor dependencies...
+echo
+python3.7 -m pip install axographio
+python3.7 -m pip install matplotlib
+python3.7 -m pip install xlsxwriter
+echo Going back to login directory, changing to flash drive...
+echo
+cd ~
+cd Desktop/Metherate-Lab/
+ls -la
+echo Starting DataProcessorv4.py...
+echo
+python3 DataProcessorv4.py
